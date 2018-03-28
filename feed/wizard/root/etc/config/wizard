@@ -1,0 +1,3 @@
+config wizard main
+	option complete 'false'
+	option firstreboot 'false'
