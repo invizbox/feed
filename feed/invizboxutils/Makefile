@@ -4,8 +4,8 @@ include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/version.mk
 
 PKG_NAME:=invizboxutils
-PKG_VERSION:=2.2
-PKG_RELEASE:=3
+PKG_VERSION:=2.3
+PKG_RELEASE:=1
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/invizboxutils
 

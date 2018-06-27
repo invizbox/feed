@@ -3,8 +3,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=netwatch
-PKG_VERSION:=0.2
-PKG_RELEASE:=4
+PKG_VERSION:=0.3
+PKG_RELEASE:=1
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/netwatch
 
@@ -52,6 +52,8 @@ define Package/netwatch/preinst
 #!/bin/sh
 # check if we are on real system
 if [ -z "$${IPKG_INSTROOT}" ]; then
+    echo "touch known_devices if needed"
+    touch $${IPKG_INSTROOT}/etc/config/known_devices
 	ln -sf /tmp/resolv.conf /etc/resolv.conf
 fi
 exit 0

@@ -102,9 +102,11 @@ function wifiwatch.get_nearest_vpn()
         end
     end)
     math.randomseed(os.time())
-    local entry = utils.uci_characters(servers[math.random(#servers)])
-    uci:set(config_name, "active", "name", entry)
-    uci:commit(config_name)
+    if #servers ~= 0 then
+        local entry = utils.uci_characters(servers[math.random(#servers)])
+        uci:set(config_name, "active", "name", entry)
+        uci:commit(config_name)
+    end
 end
 
 function wifiwatch.deal_with_station(first_reboot)

@@ -134,7 +134,7 @@ function netwatch.set_time()
     local device_time = utils.get_first_line("/tmp/current_time.txt")
     if utils.success(utils.download("https://invizbox.com/cgi-bin/unixtime", "/tmp/web_time.txt", true)) then
         local web_time = utils.get_first_line("/tmp/web_time.txt")
-        if math.abs(device_time - web_time) > 300 then
+        if web_time:match("%d+") and math.abs(device_time - web_time) > 300 then
             utils.log("resolving a big time discrepancy between local time and web time")
             os.execute("date +%s -s @"..web_time)
         end

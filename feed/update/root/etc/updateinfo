@@ -1,0 +1,24 @@
+config version version
+	option firmware %V
+
+config url onion
+	option vpn_configuration http://invizboxinobxs4f.onion/invizbox_vpn/latest/invizbox_vpn_configuration.zip
+	option vpn_configuration_sha http://invizboxinobxs4f.onion/invizbox_vpn/latest/invizbox_vpn_configuration.sha
+	option vpn_configuration_content_sha http://invizboxinobxs4f.onion/invizbox_vpn/latest/invizbox_vpn_configuration.content.sha
+	option new_firmware_version http://invizboxinobxs4f.onion/go_3.x/latest/firmware_version.txt
+	option new_firmware http://invizboxinobxs4f.onion/go_3.x/latest/InvizBox-Go-%s-sysupgrade.bin
+	option new_firmware_sha http://invizboxinobxs4f.onion/go_3.x/latest/InvizBox-Go-%s-sysupgrade.sha
+	option vpn_status http://invizboxinobxs4f.onion/vpn_status
+
+config url clearnet
+	option vpn_configuration http://54.194.50.97/invizbox_vpn/latest/invizbox_vpn_configuration.zip
+	option vpn_configuration_sha http://54.194.50.97/invizbox_vpn/latest/invizbox_vpn_configuration.sha
+	option vpn_configuration_content_sha http://54.194.50.97/invizbox_vpn/latest/invizbox_vpn_configuration.content.sha
+	option new_firmware_version http://54.194.50.97/go_3.x/latest/firmware_version.txt
+	option new_firmware http://54.194.50.97/go_3.x/latest/InvizBox-Go-%s-sysupgrade.bin
+	option new_firmware_sha http://54.194.50.97/go_3.x/latest/InvizBox-Go-%s-sysupgrade.sha
+	option vpn_status https://54.194.50.97/vpn_status
+
+config active active
+	option current_content_sha 123456
+	option last_successful_update 0

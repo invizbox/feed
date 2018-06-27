@@ -1,4 +1,12 @@
-#!/bin/ash
+#!/bin/sh
+
+# Copyright 2017 InvizBox Ltd
+#
+# Licensed under the InvizBox Shared License;
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#        https://www.invizbox.com/lic/license.txt
 
 # Store rule numbers of FORWARD rules added via netwatch.lua
 for line_num in $(iptables --line-numbers --list FORWARD | grep 'invizbox' | awk '{print $1}')

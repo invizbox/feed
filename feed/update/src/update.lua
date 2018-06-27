@@ -179,6 +179,10 @@ function update.update_firmware()
     return true
 end
 
+function update.restore_material_theme()
+    os.execute("uci set luci.themes.Material=/luci-static/material; uci set luci.main.mediaurlbase=/luci-static/material; uci commit luci")
+end
+
 function update.update_opkg()
     local upgrade_command = "PACKS=\"$(opkg list-upgradable | awk '{ printf \"%s \",$1 }')\"; "..
             "if [[ ! -z \"${PACKS}\" ]]; then "..
@@ -192,6 +196,7 @@ function update.update_opkg()
         utils.log(utils.run_and_log("cat /var/log/opkg_update.log"))
         os.execute(upgrade_command)
         utils.log(utils.run_and_log("cat /var/log/opkg_upgrade.log"))
+        update.restore_material_theme()
         return 0
     else
         utils.log("Updating opkg via clearnet.")
@@ -199,6 +204,7 @@ function update.update_opkg()
         utils.log(utils.run_and_log("cat /var/log/opkg_update.log"))
         os.execute(upgrade_command)
         utils.log(utils.run_and_log("cat /var/log/opkg_upgrade.log"))
+        update.restore_material_theme()
         return 1
     end
 end

@@ -11,15 +11,24 @@ local socket = require "socket"
 local ltn12 = require "ltn12"
 local sys = require "luci.sys"
 local translate = require "luci.i18n"
+local uci = require("uci").cursor()
 
 local invizboxutils ={}
 
 function invizboxutils.success(http_code)
-    return http_code >= 200 and http_code < 300
+    if http_code then
+        return http_code >= 200 and http_code < 300
+    else
+        return false
+    end
 end
 
 function invizboxutils.redirect(http_code)
-    return http_code >= 300 and http_code < 400
+    if http_code then
+        return http_code >= 300 and http_code < 400
+    else
+        return false
+    end
 end
 
 function invizboxutils.download(url, file, ssl)
@@ -36,7 +45,11 @@ function invizboxutils.download(url, file, ssl)
         if resp and (invizboxutils.success(code) or invizboxutils.redirect(code)) then
             break
         else
-            invizboxutils.log("failed to download url "..url.." with code ["..code.."]")
+            if code then
+                invizboxutils.log("failed to download url "..url.." with code ["..code.."]")
+            else
+                invizboxutils.log("failed to download url "..url.." without error code - most likely captive")
+            end
         end
     end
     if resp == nil or (not invizboxutils.success(code) and not invizboxutils.redirect(code)) then
@@ -158,6 +171,17 @@ function invizboxutils.tor_request(sock, command)
     end
 
     return true, reply
+end
+
+function invizboxutils.get_vpn_interfaces()
+    local vpn_list = {}
+    local config_name = "network"
+    uci:foreach(config_name, "interface", function(section)
+        if string.sub(section[".name"], 1, 3) == "vpn" then
+            vpn_list[section[".name"]] = section["ifname"]
+        end
+    end)
+    return vpn_list
 end
 
 return invizboxutils

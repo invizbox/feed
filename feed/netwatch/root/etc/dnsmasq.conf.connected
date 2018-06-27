@@ -1,3 +1,4 @@
+dhcp-script=/usr/lib/lua/new_device.lua
 server=/onion/172.16.1.1#9053
 rebind-domain-ok=onion
 dhcp-range=lan,10.153.146.2,10.153.146.253,255.255.255.0,10m

@@ -31,11 +31,7 @@ endef
 
 define Package/torcheck/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci
-	$(INSTALL_DIR) $(1)/etc/tor
 	$(CP) $(PKG_BUILD_DIR)/src/*  $(1)/usr/lib/lua/luci/
-	touch $(1)/etc/tor/bridges
-	touch $(1)/etc/tor/proxy
-	touch $(1)/etc/tor/geoip
 endef
 
 $(eval $(call BuildPackage,torcheck))
