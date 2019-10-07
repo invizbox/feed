@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="89px"
+   height="43px"
+   viewBox="0 0 89 43"
+   version="1.1"
+   id="svg1499"
+   sodipodi:docname="device-gaming.svg"
+   inkscape:version="0.92.3 (2405546, 2018-03-11)">
+  <metadata
+     id="metadata1503">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1920"
+     inkscape:window-height="1022"
+     id="namedview1501"
+     showgrid="false"
+     inkscape:zoom="10.921348"
+     inkscape:cx="44.5"
+     inkscape:cy="21.5"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1499" />
+  <!-- Generator: Sketch 52.6 (67491) - http://www.bohemiancoding.com/sketch -->
+  <title
+     id="title1471">Group 8</title>
+  <desc
+     id="desc1473">Created with Sketch.</desc>
+  <defs
+     id="defs1476">
+    <path
+       d="M0.33984176,20.9622216 C0.571792529,12.3567748 5.40760036,5.99929868 14.8472653,1.88979316 L14.8472643,1.88979091 C24.97486,-2.51920145 36.7590929,2.11664249 41.1680853,12.2442382 C43.0243087,16.5080425 43.3367024,21.2854196 42.0515331,25.7546402 C40.2437389,32.0413071 39.3398418,38.3668111 39.3398418,44.7311524 C39.3398418,50.7781257 40.155838,56.8299466 41.7878306,62.8866153 L41.7878287,62.8866158 C44.6616342,73.5519145 38.345381,84.527527 27.6800823,87.4013325 C23.287748,88.5848638 18.6231727,88.2356809 14.4559988,86.411398 C5.08645419,82.3096494 0.381068514,76.6326547 0.33984176,69.3804139 C0.215301559,47.4724191 -0.35825845,46.8619598 0.33984176,20.9622216 Z"
+       id="path-1" />
+    <mask
+       id="mask-2"
+       fill="white">
+      <use
+         xlink:href="#path-1"
+         id="use1478"
+         x="0"
+         y="0"
+         width="100%"
+         height="100%" />
+    </mask>
+  </defs>
+  <g
+     id="g9986">
+    <use
+       transform="rotate(90,44.5,44.5)"
+       height="100%"
+       width="100%"
+       y="0"
+       x="0"
+       style="fill:#d9dce1;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1"
+       xlink:href="#path-1"
+       id="Mask" />
+    <g
+       transform="rotate(90,44.5,44.5)"
+       style="fill:#549321;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1"
+       mask="url(#mask-2)"
+       id="Group-6">
+      <g
+         style="fill:#549321;fill-opacity:1"
+         id="g1484"
+         transform="translate(17,8)">
+        <ellipse
+           style="fill:#549321;fill-opacity:1"
+           ry="3.6363637"
+           rx="3.6086957"
+           cy="3.6636364"
+           cx="3.6086957"
+           id="Oval" />
+        <ellipse
+           style="fill:#549321;fill-opacity:1"
+           ry="3.6363637"
+           rx="3.6086957"
+           cy="19.636364"
+           cx="3.6086957"
+           id="Oval-Copy-3" />
+      </g>
+    </g>
+    <g
+       transform="rotate(90,44.5,44.5)"
+       style="fill:#549321;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:1"
+       mask="url(#mask-2)"
+       id="Group-7">
+      <g
+         style="fill:#549321;fill-opacity:1"
+         id="g1489"
+         transform="translate(9,16)">
+        <ellipse
+           style="fill:#549321;fill-opacity:1"
+           ry="3.6363637"
+           rx="3.6086957"
+           cy="3.6363637"
+           cx="3.6086957"
+           id="Oval-Copy-4" />
+        <ellipse
+           style="fill:#549321;fill-opacity:1"
+           ry="3.6363637"
+           rx="3.6086957"
+           cy="3.6363637"
+           cx="19.608696"
+           id="Oval-Copy-5" />
+      </g>
+    </g>
+    <text
+       y="-9"
+       id="+"
+       font-size="41.85"
+       font-weight="bold"
+       style="font-weight:bold;font-size:41.84999847px;font-family:Comfortaa-Bold, Comfortaa;fill:#549321;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1;">
+      <tspan
+         style="fill:#549321;fill-opacity:1;"
+         x="9"
+         y="37"
+         id="tspan1493">+</tspan>
+    </text>
+  </g>
+</svg>

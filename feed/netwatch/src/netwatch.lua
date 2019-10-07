@@ -8,11 +8,15 @@ local nixio = require "nixio"
 local utils = require "invizboxutils"
 local led = require "ledcontrol"
 local uci = require("uci").cursor()
+local defaultpassword = require("defaultpassword")
+local signal = require("posix.signal")
 
 local netwatch = {}
 netwatch.running = true
-netwatch.access_point = "br-ap"
-netwatch.station = "apcli0"
+netwatch.access_point = "br-lan"
+netwatch.station = uci:get("network", "wan", "ifname") or uci:get("wireless", "wan", "ifname")
+netwatch.device_ip = uci:get("network", "lan", "ipaddr")
+netwatch.dhcp_range = netwatch.device_ip:match("[0-9]*%.[0-9]*%.[0-9]*%.").."0"
 netwatch.vpn = "tun0"
 netwatch.tor = "eth0.3"
 netwatch.vpn_mode = "vpn"
@@ -21,8 +25,8 @@ netwatch.tor_mode = "tor"
 function netwatch.check_captive_portal()
     -- make sure dnsmasq is up and running to avoid DNS timeouts
     local dnsmasq_up = false
-    for _ = 1,5 do
-        dnsmasq_up = os.execute("test -e /tmp/run/dnsmasq/dnsmasq*.pid") == 0
+    for _ = 1, 5 do
+        dnsmasq_up = os.execute("ls /tmp/run/dnsmasq/dnsmasq.*.pid 1> /dev/null 2>&1") == 0
         if dnsmasq_up then
             break
         else
@@ -35,18 +39,14 @@ function netwatch.check_captive_portal()
     end
 
     -- captive portal URL check
-    local http_code = utils.download("http://clients3.google.com/generate_204", "/tmp/204.txt")
-    if http_code == 0 then
-        utils.log("Error - unable to connect to a web server during the captive portal test")
-        return nil
+    if utils.s_download("https://update.invizbox.com/captive", "/tmp/captive") then
+        if utils.get_first_line( "/tmp/captive") == "invizbox" then
+            return false
+        else
+            return true
+        end
     end
-    -- 204 and size 0 file means not a capture portal
-    local script = 'eval "if [ -s /tmp/204.txt ] ; then exit 1 ; fi"'
-    if http_code == 204 and os.execute("sh -c '"..script.."'") == 0 then
-        return false
-    else
-        return true
-    end
+    return true
 end
 
 -- here for unit testing the main function by overwriting this function
@@ -63,59 +63,12 @@ function netwatch.reset_iptables()
 end
 
 function netwatch.set_status(option, status)
-    local config_name = "status"
+    local config_name = "netwatch"
     uci:load(config_name)
-    uci:set(config_name, "current", option, status)
+    uci:set(config_name, "status", option, status)
     uci:save(config_name)
     uci:commit(config_name)
     return true
-end
-
-function netwatch.set_dnsmasq(connected)
-    if connected then
-        os.execute("ln -s -f /etc/dnsmasq.conf.connected /etc/dnsmasq.conf")
-        utils.log("set dnsmasq to connected")
-    else
-        os.execute("ln -s -f /etc/dnsmasq.conf.captive /etc/dnsmasq.conf")
-        utils.log("set dnsmasq to captive")
-    end
-end
-
-function netwatch.set_dnsmasq_rebind_protection(on)
-    local config_name = "dhcp"
-    uci:load(config_name)
-    local name
-    uci:foreach(config_name, "dnsmasq", function(s)
-        name = s['.name']
-    end)
-    if on then
-        uci:set(config_name, name, "rebind_protection", "1")
-        utils.log("set dnsmasq rebind_protection to 1 (on)")
-    else
-        uci:set(config_name, name, "rebind_protection", "0")
-        utils.log("set dnsmasq rebind_protection to 0 (off)")
-    end
-    uci:save(config_name)
-    uci:commit(config_name)
-end
-
-function netwatch.set_dnsmasq_resolv(on)
-    local config_name = "dhcp"
-    uci:load(config_name)
-    local name
-    uci:foreach(config_name, "dnsmasq", function(s)
-        name = s['.name']
-    end)
-    if on then
-        uci:set(config_name, name, "resolvfile", "/etc/resolv.conf.vpn")
-        utils.log("set dnsmasq resolv.conf to vpn")
-    else
-        uci:set(config_name, name, "resolvfile", "/tmp/resolv.conf.auto")
-        utils.log("set dnsmasq resolv.conf to auto")
-    end
-    uci:save(config_name)
-    uci:commit(config_name)
-    os.execute("/etc/init.d/dnsmasq restart")
 end
 
 function netwatch.set_local_resolv(auto)
@@ -128,19 +81,22 @@ function netwatch.set_local_resolv(auto)
     end
 end
 
+function netwatch.set_dnsmasq_uci(option_name)
+    utils.log("enabling the following dhcp profile: "..option_name)
+    local config_name = "dhcp"
+    uci:set(config_name, "captive", "disabled", "1")
+    uci:set(config_name, "auto", "disabled", "1")
+    uci:set(config_name, "tor", "disabled", "1")
+    uci:set(config_name, "vpn", "disabled", "1")
+    uci:set(config_name, option_name, "disabled", "0")
+    uci:save(config_name)
+    uci:commit(config_name)
+    os.execute("/etc/init.d/dnsmasq restart")
+end
+
 function netwatch.set_time()
     -- first check for a big time discrepancy over http (enough to enable login for openvpn - main issue)
-    os.execute("date +%s > /tmp/current_time.txt")
-    local device_time = utils.get_first_line("/tmp/current_time.txt")
-    if utils.success(utils.download("https://invizbox.com/cgi-bin/unixtime", "/tmp/web_time.txt", true)) then
-        local web_time = utils.get_first_line("/tmp/web_time.txt")
-        if web_time:match("%d+") and math.abs(device_time - web_time) > 300 then
-            utils.log("resolving a big time discrepancy between local time and web time")
-            os.execute("date +%s -s @"..web_time)
-        end
-    else
-        utils.log("unable to get web time to validate local time")
-    end
+    os.execute("htpdate -s en.wikipedia.org www.apache.org www.duckduckgo.com www.mozilla.org")
     -- then rely on ntp (if network allows - otherwise above will have to suffice)
     os.execute("/etc/init.d/sysntpd restart")
 end
@@ -177,19 +133,19 @@ function netwatch.no_network()
     netwatch.set_status("wan", "Down")
     netwatch.set_status("vpn", "Down")
     netwatch.set_status("status", "No Internet Connection")
-    led.red_solid()
-    utils.log("going red solid")
+    led.not_connected()
     -- DNS - order matters!!!
     netwatch.set_local_resolv(true)
-    netwatch.set_dnsmasq(false)
-    netwatch.set_dnsmasq_rebind_protection(true)
-    netwatch.set_dnsmasq_resolv(false)
+    netwatch.set_dnsmasq_uci("captive")
     -- routing
     netwatch.reset_iptables()
     os.execute("sysctl -w net.ipv4.ip_forward=1")
-    os.execute('iptables -t nat -I PREROUTING -p tcp --dport 80 --jump DNAT --to-destination 10.153.146.1:80 -m comment --comment "invizbox"')
-    os.execute('iptables -t nat -I PREROUTING -p tcp --dport 443 --jump DNAT --to-destination 10.153.146.1:80 -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o br-lan -d inviz.box -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I PREROUTING -p tcp --dport 80 --jump DNAT --to-destination '..netwatch.device_ip..
+            ':80 -m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I PREROUTING -p tcp --dport 443 --jump DNAT --to-destination '..netwatch.device_ip..
+            ':80 -m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o br-lan -d inviz.box -m conntrack '..
+            '--ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
     -- waiting
     while netwatch.running do
         utils.sleep(100)
@@ -202,29 +158,26 @@ function netwatch.captive_portal()
     netwatch.set_status("wan", "Up")
     netwatch.set_status("vpn", "Down")
     netwatch.set_status("status", "Behind Captive Portal")
-    led.orange_solid()
-    utils.log("going orange solid")
+    led.captive()
     -- DNS - order matters!!!
-    netwatch.set_dnsmasq(true)
-    netwatch.set_dnsmasq_rebind_protection(false)
-    netwatch.set_dnsmasq_resolv(false)
+    netwatch.set_dnsmasq_uci("auto")
     netwatch.set_local_resolv(false)
     -- routing
     netwatch.reset_iptables()
     os.execute("sysctl -w net.ipv4.ip_forward=1")
-    os.execute('iptables -t nat -I POSTROUTING --out-interface '..netwatch.station..' -j MASQUERADE -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o '..netwatch.station..' -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.station..' -o '..netwatch.access_point..' -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o br-lan -d inviz.box -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I POSTROUTING --out-interface '..netwatch.station..
+            ' -j MASQUERADE -m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o '..netwatch.station..
+            ' -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.station..' -o '..netwatch.access_point..
+            ' -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o br-lan -d inviz.box -m conntrack '..
+            '--ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
     -- waiting
     while netwatch.running do
         local result = netwatch.check_captive_portal()
         if result == false then
             utils.log("we're not behind a captive portal anymore, restarting to deal with it")
-            break
-        end
-        if result == nil then
-            utils.log("unable to determine if behind a captive portal or not, restarting to deal with it")
             break
         end
         netwatch.running = netwatch.keep_running()
@@ -241,21 +194,21 @@ function netwatch.network_no_vpn_or_tor(vpn)
     else
         netwatch.set_status("status", "No Tor Connection")
     end
-    led.orange_flashing()
-    utils.log("going orange flashing")
+    led.connected_not_secure()
     -- DNS - order matters!!!
     netwatch.set_local_resolv(true)
-    netwatch.set_dnsmasq(false)
-    netwatch.set_dnsmasq_rebind_protection(true)
-    netwatch.set_dnsmasq_resolv(false)
+    netwatch.set_dnsmasq_uci("captive")
     -- set time
     netwatch.set_time()
     -- routing
     netwatch.reset_iptables()
     os.execute("sysctl -w net.ipv4.ip_forward=1")
-    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o br-lan -d inviz.box -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
-    os.execute('iptables -t nat -I PREROUTING -p tcp --dport 80 --jump DNAT --to-destination 10.153.146.1:80 -m comment --comment "invizbox"')
-    os.execute('iptables -t nat -I PREROUTING -p tcp --dport 443 --jump DNAT --to-destination 10.153.146.1:80 -m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o br-lan -d inviz.box -m conntrack '..
+            '--ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I PREROUTING -p tcp --dport 80 --jump DNAT --to-destination '..netwatch.device_ip..
+            ':80 -m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I PREROUTING -p tcp --dport 443 --jump DNAT --to-destination '..netwatch.device_ip..
+            ':80 -m comment --comment "invizbox"')
     -- waiting
     while netwatch.running do
         if not vpn and netwatch.tor_is_up() then
@@ -276,23 +229,25 @@ function netwatch.use_tor()
     netwatch.set_status("wan", "Up")
     netwatch.set_status("vpn", "Up")
     netwatch.set_status("status", "Secure Connection - Tor Active")
-    led.green_solid()
-    utils.log("going green solid")
+    led.secure()
     -- DNS - order matters!!!
-    netwatch.set_dnsmasq(true)
-    netwatch.set_dnsmasq_rebind_protection(true)
-    netwatch.set_dnsmasq_resolv(false)
+    netwatch.set_dnsmasq_uci("tor")
     netwatch.set_local_resolv(false)
     -- set time
     netwatch.set_time()
     -- routing
     netwatch.reset_iptables()
     os.execute("sysctl -w net.ipv4.ip_forward=1")
-    os.execute('iptables -t nat -I PREROUTING -p udp -m multiport --dport 3478,19302 -j REDIRECT --to-ports 9999 -m comment --comment "invizbox"')
-    os.execute('iptables -t nat -I PREROUTING -p udp -m multiport --sport 3478,19302 -j REDIRECT --to-ports 9999 -m comment --comment "invizbox"')
-    os.execute('iptables -t nat -I PREROUTING -s 10.153.146.1/24 -p udp --dport 53 -j DNAT --to-destination 172.16.1.1:9053 -m comment --comment "invizbox"')
-    os.execute('iptables -t nat -I PREROUTING -s 10.153.146.0/24 \\! -d 10.153.146.1 -p tcp --syn -j DNAT --to-destination 172.16.1.1:9040 -m comment --comment "invizbox"')
-    os.execute('iptables -t nat -I OUTPUT -d 10.192.0.0/16 -p tcp --syn -j DNAT --to-destination 172.16.1.1:9040 -m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I PREROUTING -p udp -m multiport --dport 3478,19302 -j REDIRECT --to-ports 9999 '..
+            '-m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I PREROUTING -p udp -m multiport --sport 3478,19302 -j REDIRECT --to-ports 9999 '..
+            '-m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I PREROUTING -s '..netwatch.device_ip..'/24 -p udp --dport 53 -j DNAT '..
+            '--to-destination 172.31.1.1:9053 -m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I PREROUTING -s '..netwatch.dhcp_range..'/24 \\! -d '..netwatch.device_ip..
+            ' -p tcp --syn -j DNAT --to-destination 172.31.1.1:9040 -m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I OUTPUT -d 10.192.0.0/16 -p tcp --syn -j DNAT --to-destination 172.31.1.1:9040 '..
+            '-m comment --comment "invizbox"')
     -- waiting
     while netwatch.running do
         if netwatch.check_captive_portal() then
@@ -309,25 +264,32 @@ function netwatch.use_extend()
     netwatch.set_status("wan", "Up")
     netwatch.set_status("vpn", "Up")
     netwatch.set_status("status", "Wifi Extender Mode (no VPN or Tor)")
-    led.orange_solid()
-    utils.log("going orange solid - Wifi extender")
+    led.clear()
     -- DNS - order matters!!!
-    netwatch.set_dnsmasq(true)
-    netwatch.set_dnsmasq_rebind_protection(false)
-    netwatch.set_dnsmasq_resolv(false)
+    netwatch.set_dnsmasq_uci("auto")
     netwatch.set_local_resolv(false)
     -- set time
     netwatch.set_time()
     -- routing
     netwatch.reset_iptables()
     os.execute("sysctl -w net.ipv4.ip_forward=1")
-    os.execute('iptables -t nat -I POSTROUTING --out-interface '..netwatch.station..' -j MASQUERADE -m comment --comment "invizbox"')
-    os.execute('iptables -t nat -I OUTPUT -d 10.192.0.0/16 -p tcp --syn -j DNAT --to-destination 172.16.1.1:9040 -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o '..netwatch.station..' -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.station..' -o '..netwatch.access_point..' -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o br-lan -d inviz.box -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I POSTROUTING --out-interface '..netwatch.station..' -j MASQUERADE '..
+            '-m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I OUTPUT -d 10.192.0.0/16 -p tcp --syn -j DNAT --to-destination 172.31.1.1:9040 '..
+            '-m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o '..netwatch.station..' -m conntrack '..
+            '--ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.station..' -o '..netwatch.access_point..' -m conntrack '..
+            '--ctstate RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o br-lan -d inviz.box -m conntrack '..
+            '--ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
     -- waiting
     while netwatch.running do
+        if netwatch.check_captive_portal() then
+            utils.log("we're behind a captive portal")
+            netwatch.captive_portal()
+            break
+        end
         netwatch.running = netwatch.keep_running()
         utils.sleep(20)
     end
@@ -338,23 +300,33 @@ function netwatch.use_vpn()
     netwatch.set_status("wan", "Up")
     netwatch.set_status("vpn", "Up")
     netwatch.set_status("status", "Secure Connection - VPN Active")
-    led.green_solid()
-    utils.log("going green solid")
+    led.secure()
     -- DNS - order matters!!!
-    netwatch.set_dnsmasq(true)
-    netwatch.set_dnsmasq_rebind_protection(true)
-    netwatch.set_dnsmasq_resolv(true)
+    netwatch.set_dnsmasq_uci("vpn")
     netwatch.set_local_resolv(false)
     -- set time
     netwatch.set_time()
     -- routing
     netwatch.reset_iptables()
     os.execute("sysctl -w net.ipv4.ip_forward=1")
-    os.execute('iptables -t nat -I OUTPUT -d 10.192.0.0/16 -p tcp --syn -j DNAT --to-destination 172.16.1.1:9040 -m comment --comment "invizbox"')
-    os.execute('iptables -t nat -I POSTROUTING --out-interface '..netwatch.vpn..' -j MASQUERADE -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o '..netwatch.vpn..' -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.vpn..' -o '..netwatch.access_point..' -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o br-lan -d inviz.box -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I OUTPUT -d 10.192.0.0/16 -p tcp --syn -j DNAT --to-destination 172.31.1.1:9040 '..
+            '-m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I POSTROUTING --out-interface '..netwatch.vpn..' -j MASQUERADE '..
+            '-m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o '..netwatch.vpn..' -m conntrack '..
+            '--ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.vpn..' -o '..netwatch.access_point..' -m conntrack '..
+            '--ctstate RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o br-lan -d inviz.box -m conntrack '..
+            '--ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
+    -- verifying credentials are saved on mtd2
+    uci:load("vpn")
+    local uci_username = uci:get("vpn", "active", "username")
+    local uci_password = uci:get("vpn", "active", "password")
+    local mtd_username, mtd_password = defaultpassword.get_vpn_credentials()
+    if uci_username ~= mtd_username or uci_password ~= mtd_password then
+        defaultpassword.set_vpn_credentials(uci_username, uci_password)
+    end
     -- waiting
     while netwatch.running do
         if netwatch.check_captive_portal() then
@@ -371,19 +343,21 @@ function netwatch.cant_determine_portal()
     netwatch.set_status("wan", "Up")
     netwatch.set_status("vpn", "Down")
     netwatch.set_status("status", "Error with Internet Connection")
-    led.red_green_flashing()
+    led.error()
     -- DNS - order matters!!!
-    netwatch.set_dnsmasq(true)
-    netwatch.set_dnsmasq_rebind_protection(false)
-    netwatch.set_dnsmasq_resolv(false)
+    netwatch.set_dnsmasq_uci("auto")
     netwatch.set_local_resolv(false)
     -- routing
     netwatch.reset_iptables()
     os.execute("sysctl -w net.ipv4.ip_forward=1")
-    os.execute('iptables -t nat -I POSTROUTING --out-interface '..netwatch.station..' -j MASQUERADE -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o '..netwatch.station..' -m conntrack --ctstate NEW,ESTABLISHED,RELATED -j ACCEPT -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.station..' -o '..netwatch.access_point..' -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT -m comment --comment "invizbox"')
-    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o br-lan -d inviz.box -m conntrack --ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -t nat -I POSTROUTING --out-interface '..netwatch.station..' -j MASQUERADE '..
+            '-m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o '..netwatch.station..' -m conntrack '..
+            '--ctstate NEW,ESTABLISHED,RELATED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.station..' -o '..netwatch.access_point..' -m conntrack '..
+            '--ctstate ESTABLISHED,RELATED -j ACCEPT -m comment --comment "invizbox"')
+    os.execute('iptables -I FORWARD -i '..netwatch.access_point..' -o br-lan -d inviz.box -m conntrack '..
+            '--ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
     -- waiting
     while netwatch.running do
         local result = netwatch.check_captive_portal()
@@ -404,6 +378,7 @@ function netwatch.main()
     netwatch.running = true
     local return_value
     utils.log("Starting netwatch")
+    utils.load_cities(netwatch)
 
     local config_name = "vpn"
     uci:load(config_name)
@@ -424,6 +399,10 @@ function netwatch.main()
         return_value = 2
     else
         utils.log(netwatch.station.." interface is up.")
+        -- Get Initial VPN server if needed
+        if (not netwatch.city_1 and not netwatch.city_2 and not netwatch.city_3) then
+            utils.get_nearest_cities(netwatch)
+        end
         if mode == netwatch.vpn_mode and interface_up[netwatch.vpn] then
             utils.log("VPN mode - "..netwatch.vpn.." interface is up - using VPN configuration.")
             netwatch.use_vpn()
@@ -462,8 +441,13 @@ function netwatch.main()
     return return_value
 end
 
+signal.signal(signal.SIGTERM, function()
+  os.exit(20)
+end)
+
 if not pcall(getfenv, 4) then
     netwatch.main()
+    os.exit(0)
 end
 
 return netwatch

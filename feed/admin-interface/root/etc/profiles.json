@@ -1,0 +1,21 @@
+{
+  "profiles": [
+    {
+      "id": "0",
+      "name": "Default Profile",
+      "type": "standard",
+      "ssh": {
+        "enabled": false
+      },
+      "deviceBlocking": {
+        "enabled": false,
+        "deviceRules": {}
+      },
+      "siteBlocking": {
+        "enabled": false,
+        "blacklistIds": [],
+        "sites": []
+      }
+    }
+  ]
+}

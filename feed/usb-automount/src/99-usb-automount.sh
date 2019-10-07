@@ -1,16 +1,10 @@
 #!/bin/sh
 
-# Copyright (C) 2015 OpenWrt.org
 # Copyright 2016 InvizBox Ltd
-#
-# Licensed under the InvizBox Shared License;
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#        https://www.invizbox.com/lic/license.txt
+# https://www.invizbox.com/lic/license.txt
 
 . /bin/ledcontrol.ash
-. /bin/mtdutils.ash
+. /bin/mtdutils.sh
 
 write_wifi_password () {
     password_file="/export/${mntpnt}/wifi_password.txt"
@@ -81,9 +75,9 @@ blkdev=`dirname ${DEVPATH}`
 basename=`basename ${blkdev}`
 device=`basename ${DEVPATH}`
 
-if [ ${basename} != "block" ] && [ -z "${device##sd*}" ] ; then
+if [ ${basename} != "block" ] && [ -z "${device##sd*}" ]; then
     islabel=`blkid /dev/${device} | grep -q LABEL ; echo $?`
-    if [ ${islabel} -eq 0 ] ; then
+    if [ ${islabel} -eq 0 ]; then
         mntpnt=`blkid /dev/${device} |sed 's/.*LABEL="\(.*\)" UUID.*/\1/'`
     else
         mntpnt=${device}

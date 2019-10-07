@@ -11,15 +11,15 @@ function fastest_ping.overall()
     local ping_processes = {}
     uci:foreach("vpn", "server", function(section)
         if section["address"] then
-            local handle = io.popen("ping -c 1 -q -s 16 -w 1 -W 1 "..section["address"].." | awk -F'/' '/avg/{print $4}'")
-            ping_processes[section["name"]] = handle
+            local hand = io.popen("ping -c 1 -q -s 16 -w 1 -W 1 "..section["address"].." | awk -F'/' '/avg/{print $4}'")
+            ping_processes[section["name"]] = hand
         end
     end)
     local ping_speeds = {}
     local fastest_location, fast_ping
     fast_ping = 1000
-    for name, handle in pairs(ping_processes) do
-        ping_speeds[name] = tonumber(handle:read("*a"):sub(1, -2))
+    for name, hand in pairs(ping_processes) do
+        ping_speeds[name] = tonumber(hand:read("*a"):sub(1, -2))
         if ping_speeds[name] and ping_speeds[name] < fast_ping then
             fastest_location = name
             fast_ping = ping_speeds[name]
@@ -32,15 +32,15 @@ function fastest_ping.in_country(country)
     local ping_processes = {}
     uci:foreach("vpn", "server", function(section)
         if section["address"] and section["country"] == country then
-            local handle = io.popen("ping -c 1 -q -s 16 -w 1 -W 1 "..section["address"].." | awk -F'/' '/avg/{print $4}'")
-            ping_processes[section["name"]] = handle
+            local hand = io.popen("ping -c 1 -q -s 16 -w 1 -W 1 "..section["address"].." | awk -F'/' '/avg/{print $4}'")
+            ping_processes[section["name"]] = hand
         end
     end)
     local ping_speeds = {}
     local fastest_location, fast_ping
     fast_ping = 1000
-    for name, handle in pairs(ping_processes) do
-        ping_speeds[name] = tonumber(handle:read("*a"):sub(1, -2))
+    for name, hand in pairs(ping_processes) do
+        ping_speeds[name] = tonumber(hand:read("*a"):sub(1, -2))
         if ping_speeds[name] and ping_speeds[name] < fast_ping then
             fastest_location = name
             fast_ping = ping_speeds[name]
@@ -53,15 +53,15 @@ function fastest_ping.in_city(city)
     local ping_processes = {}
     uci:foreach("vpn", "server", function(section)
         if section["address"] and section["city"] == city then
-            local handle = io.popen("ping -c 1 -q -s 16 -w 1 -W 1 "..section["address"].." | awk -F'/' '/avg/{print $4}'")
-            ping_processes[section["name"]] = handle
+            local hand = io.popen("ping -c 1 -q -s 16 -w 1 -W 1 "..section["address"].." | awk -F'/' '/avg/{print $4}'")
+            ping_processes[section["name"]] = hand
         end
     end)
     local ping_speeds = {}
     local fastest_location, fast_ping
     fast_ping = 1000
-    for name, handle in pairs(ping_processes) do
-        ping_speeds[name] = tonumber(handle:read("*a"):sub(1, -2))
+    for name, hand in pairs(ping_processes) do
+        ping_speeds[name] = tonumber(hand:read("*a"):sub(1, -2))
         if ping_speeds[name] and ping_speeds[name] < fast_ping then
             fastest_location = name
             fast_ping = ping_speeds[name]

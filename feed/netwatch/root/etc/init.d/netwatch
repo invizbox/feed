@@ -12,6 +12,9 @@ start_service() {
 	procd_set_param stdout 1
 	procd_set_param stderr 1
 	procd_set_param respawn
+	procd_append_param respawn 3600
+	procd_append_param respawn 5
+	procd_append_param respawn 0
 	procd_close_instance
 }
 
@@ -24,7 +27,8 @@ service_triggers() {
     procd_open_trigger
 	procd_add_interface_trigger "interface.*" vpn /etc/init.d/netwatch reload vpn
 	procd_add_interface_trigger "interface.*" wan /etc/init.d/netwatch reload wan
-	procd_add_interface_trigger "interface.*" tor /etc/init.d/netwatch reload wan
+	procd_add_interface_trigger "interface.*" tor /etc/init.d/netwatch reload tor
 	procd_add_reload_trigger "vpn"
+	procd_add_reload_trigger "netwatch"
 	procd_close_trigger
 }

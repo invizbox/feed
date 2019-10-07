@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="36px"
+   height="66px"
+   viewBox="0 0 36 66"
+   version="1.1"
+   id="svg7254"
+   sodipodi:docname="device-phone.svg"
+   inkscape:version="0.92.3 (2405546, 2018-03-11)">
+  <metadata
+     id="metadata7260">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <defs
+     id="defs7258" />
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="1920"
+     inkscape:window-height="1022"
+     id="namedview7256"
+     showgrid="false"
+     inkscape:zoom="10.11377"
+     inkscape:cx="18"
+     inkscape:cy="33"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg7254" />
+  <!-- Generator: Sketch 52.6 (67491) - http://www.bohemiancoding.com/sketch -->
+  <title
+     id="title7239">2627277-bolt-charge-device-electricity-energy-mobile-power copy</title>
+  <desc
+     id="desc7241">Created with Sketch.</desc>
+  <g
+     id="g7834">
+    <path
+       style="fill:#d9dce1;fill-rule:nonzero;stroke:none;stroke-width:1"
+       inkscape:connector-curvature="0"
+       id="Shape"
+       d="M 0,8.9645669 H 35.737346 V 62.751968 c 0,1.643504 -1.1487,2.988189 -2.552668,2.988189 H 2.5526676 C 1.1487004,65.740157 0,64.395472 0,62.751968 Z" />
+    <path
+       style="fill:#d9dce1;fill-rule:nonzero;stroke:none;stroke-width:1"
+       inkscape:connector-curvature="0"
+       id="path7244"
+       d="M 0,8.9645669 H 35.737346 V 2.988189 C 35.737346,1.344685 34.588646,0 33.184678,0 H 2.5526676 C 1.1487004,0 0,1.344685 0,2.988189 Z" />
+    <g
+       id="g7827">
+      <path
+         d="M 9,-9e-7 H 27.165918 V 1.976377 c 0,0.543504 -0.583905,0.988189 -1.297566,0.988189 H 10.297566 C 9.5839045,2.964566 9,2.519881 9,1.976377 Z"
+         id="path7246"
+         inkscape:connector-curvature="0"
+         style="fill:#7bd235;fill-rule:nonzero;stroke:none;stroke-width:1;fill-opacity:1" />
+    </g>
+    <path
+       d="M 18.576039,61.207349 H 17.902513"
+       id="path7249"
+       inkscape:connector-curvature="0"
+       style="fill:none;fill-rule:evenodd;stroke:#549321;stroke-width:5.86000013;stroke-linecap:round;stroke-linejoin:round;stroke-opacity:1" />
+  </g>
+</svg>

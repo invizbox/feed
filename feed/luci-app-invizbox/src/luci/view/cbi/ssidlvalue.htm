@@ -1,0 +1,20 @@
+<%+cbi/valueheader%>
+<select class="cbi-input-select" data-update="change"<%=
+	attr("id", cbid) ..
+	attr("name", cbid) ..
+	ifattr(self.size, "size")
+%>>
+	<% for i, key in pairs(self.keylist) do %>
+		<option<%=
+			attr("id", cbid.."-"..key) ..
+			attr("value", key) ..
+			attr("data-index", i) ..
+			attr("data-depends", self:deplist2json(section, self.deplist[i])) ..
+			ifattr(tostring(self:cfgvalue(section) or self.default) == key, "selected", "selected")
+		%>><%=pcdata(self.vallist[i])%></option>
+	<%- end %>
+</select>
+<a href='#' onclick='location.reload(true); return false;'>
+	<i id="repeat-scan"  class="fa fa-refresh fa-lg" aria-hidden="true" title="Rescan Network"></i>
+</a>
+<%+cbi/valuefooter%>

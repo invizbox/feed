@@ -1,0 +1,5 @@
+config status 'status'
+	option lan 'Up'
+	option wan 'Down'
+	option vpn 'Down'
+	option status 'Default State'

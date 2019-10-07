@@ -1,0 +1,11 @@
+--- a/setup.py
++++ b/setup.py
+@@ -184,7 +184,7 @@ setup(
+     zip_safe=False,
+     url='https://github.com/ua-parser/uap-python',
+     include_package_data=True,
+-    setup_requires=['pyyaml'],
++    setup_requires=[],
+     install_requires=[],
+     cmdclass=cmdclass,
+     classifiers=[

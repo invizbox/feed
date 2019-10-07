@@ -1,0 +1,3 @@
+config user 1
+	option name 'root'
+	option password 'TOKENPASSWORD'

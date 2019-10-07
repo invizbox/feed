@@ -7,24 +7,23 @@ PKG_NAME:=update
 PKG_VERSION:=$(VERSION_NUMBER)
 PKG_RELEASE:=1
 
-PKG_BUILD_DIR:=$(BUILD_DIR)/update
+PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 
 include $(INCLUDE_DIR)/package.mk
 
-define Package/update
+define Package/$(PKG_NAME)
 	SECTION:=invizbox
 	CATEGORY:=InvizBox
 	DEPENDS:=+unzip +invizboxutils +tor
 	TITLE:=VPN configs, IPKs and firmware updater
 endef
 
-define Package/update/description
+define Package/$(PKG_NAME)/description
 	Provides the functionality required to download up to date VPN configuration are regular interval
 endef
 
-define Package/update/conffiles
-/etc/opkg_clearnet.conf
-/etc/updateinfo
+define Package/$(PKG_NAME)/conffiles
+/etc/config/update
 endef
 
 define Build/Prepare
@@ -39,28 +38,27 @@ endef
 define Build/Compile
 endef
 
-define Package/update/postinst
+define Package/$(PKG_NAME)/postinst
 #!/bin/sh
 # check if we are on real system
 if [ -z "$${IPKG_INSTROOT}" ]; then
-    uci -c /etc set updateinfo.version.firmware=$(VERSION_NUMBER)
-    uci -c /etc set updateinfo.onion.new_firmware=http://invizboxinobxs4f.onion/go_3.x/latest/InvizBox-Go-%s-sysupgrade.bin
-    uci -c /etc set updateinfo.onion.new_firmware_sha=http://invizboxinobxs4f.onion/go_3.x/latest/InvizBox-Go-%s-sysupgrade.sha
-    uci -c /etc set updateinfo.clearnet.new_firmware=http://54.194.50.97/go_3.x/latest/InvizBox-Go-%s-sysupgrade.bin
-    uci -c /etc set updateinfo.clearnet.new_firmware_sha=http://54.194.50.97/go_3.x/latest/InvizBox-Go-%s-sysupgrade.sha
-    uci -c /etc commit updateinfo
+    uci set update.version.firmware=$(VERSION_NUMBER)
+    uci commit update
 fi
 exit 0
 endef
 
-define Package/update/install
+define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/* $(1)/usr/lib/lua/
 	$(INSTALL_DIR) $(1)/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/* $(1)/bin/
-	$(INSTALL_DIR) $(1)/etc
-	$(INSTALL_CONF) $(PKG_BUILD_DIR)/root/etc/* $(1)/etc/
-	$(SED) 's,%V,$(VERSION_NUMBER),g' $(1)/etc/updateinfo
+	$(INSTALL_DIR) $(1)/etc/config
+	$(INSTALL_CONF) $(PKG_BUILD_DIR)/root/etc/config/update $(1)/etc/config
+	$(SED) 's,%V,$(VERSION_NUMBER),g' $(1)/etc/config/update
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/root/etc/uci-defaults/99-update $(1)/etc/uci-defaults/99-update
+	$(SED) 's,%V,$(VERSION_NUMBER),g' $(1)/etc/uci-defaults/99-update
 endef
 
-$(eval $(call BuildPackage,update))
+$(eval $(call BuildPackage,$(PKG_NAME)))

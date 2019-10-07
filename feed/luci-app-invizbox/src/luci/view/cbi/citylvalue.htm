@@ -1,0 +1,18 @@
+<%+cbi/valueheader%>
+<select class="cbi-input-select" data-update="change"<%=
+	attr("id", self.id) ..
+	attr("name", self.id) ..
+	ifattr(self.size, "size")
+%>>
+	<% for i, key in pairs(self.keylist) do
+			value = self.vallist[i] %>
+		<option<%=
+			attr("id", self.id.."-"..key) ..
+			attr("filtercountry", self.countries[value]) ..
+			attr("value", key) ..
+			attr("data-index", i) ..
+			attr("data-depends", self:deplist2json(section, self.deplist[i]))
+		%>><%=pcdata(value)%></option>
+	<%- end %>
+</select>
+<%+cbi/valuefooter%>

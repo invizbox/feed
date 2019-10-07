@@ -1,0 +1,21 @@
+--- a/htpdate.c
++++ b/htpdate.c
+@@ -391,7 +391,7 @@ static int htpdate_adjtimex( double drif
+ 
+ 	/* Read current kernel frequency */
+ 	tmx.modes = 0;
+-	ntp_adjtime(&tmx);
++	adjtimex(&tmx);
+ 
+ 	/* Calculate new frequency */
+ 	freq = (long)(65536e6 * drift);
+@@ -406,7 +406,7 @@ static int htpdate_adjtimex( double drif
+ 
+ 	/* Become root */
+ 	swuid(0);
+-	return( ntp_adjtime(&tmx) );
++	return( adjtimex(&tmx) );
+ 
+  }
+ 
+
