@@ -15,28 +15,42 @@ from utils.validate import validate_option
 
 
 LOGGER = logging.getLogger(__name__)
+IPSEC_PKG = "ipsec"
 VPN_PKG = "vpn"
 
 VPN_APP = Bottle()
 VPN_APP.install(JWT_PLUGIN)
 VPN_APP.install(UCI_PLUGIN)
+VPN_APP.ipsec_on = False
 
 
-def get_locations(uci):
-    """helper function to get a list of VPN locations"""
+def get_locations_protocols(uci):
+    """helper function to get a list of VPN locations and protocols"""
     vpn_uci = uci.get_package(VPN_PKG)
     locations = {}
+    protocols = {}
     for vpn in vpn_uci:
         if vpn[".type"] == "server":
             country = ISO_COUNTRY.get(vpn["country"], vpn["country"])
-            if country in locations:
-                if vpn["city"] in locations[country]:
-                    locations[country][vpn["city"]].append(vpn["id"])
-                else:
-                    locations[country][vpn["city"]] = [vpn["id"]]
-            else:
-                locations[country] = {vpn["city"]: [vpn["id"]]}
-    return locations
+            city = vpn["city"]
+            protocol_list = vpn["protocol_id"]
+            if country not in locations:
+                locations[country] = {}
+            if city not in locations[country]:
+                locations[country][city] = {}
+            for protocol in protocol_list:
+                if protocol not in locations[country][city]:
+                    locations[country][city][protocol] = []
+                locations[country][city][protocol].append(vpn["id"])
+        elif vpn[".type"] == "protocol":
+            protocols[vpn["id"]] = {
+                "vpnProtocol": vpn["vpn_protocol"],
+                "ipProtocol": vpn["ip_protocol"],
+                "port": vpn["port"]
+            }
+            if vpn["ip_protocol"] == "IPsec":
+                VPN_APP.ipsec_on = True
+    return locations, protocols
 
 
 @VPN_APP.get('/system/vpn')
@@ -44,25 +58,36 @@ def get_locations(uci):
 def get_vpn(uci):
     """gets the VPN credentials, account status and available locations"""
     try:
-        username, password = ("", "")
+        openvpn_username, openvpn_password = ("", "")
+        registered, renewal, expiry = ("unknown", "unknown", "unknown")
         try:
             with open("/etc/openvpn/login.auth", "r") as vpn_credentials_file:
-                username = vpn_credentials_file.readline().rstrip()
-                password = vpn_credentials_file.readline().rstrip()
+                openvpn_username = vpn_credentials_file.readline().rstrip()
+                openvpn_password = vpn_credentials_file.readline().rstrip()
         except (FileNotFoundError, IOError, StopIteration):
             pass
-        locations = get_locations(uci)
+        locations, protocols = get_locations_protocols(uci)
         for vpn in uci.get_package(VPN_PKG):
             if vpn[".type"] == "active":
                 registered = vpn["registered"] if "registered" in vpn else "unknown"
                 renewal = vpn["renewal"] if "renewal" in vpn else "unknown"
                 expiry = vpn["expiry"] if "expiry" in vpn else "unknown"
+        account = {
+            "openvpnUsername": openvpn_username,
+            "openvpnPassword": openvpn_password,
+            "registered": registered,
+            "renewal": renewal,
+            "expiry": expiry
+        }
+        try:
+            if VPN_APP.ipsec_on:
+                account["ipsecUsername"] = uci.get_option(IPSEC_PKG, "vpn_1", "eap_identity")
+                account["ipsecPassword"] = uci.get_option(IPSEC_PKG, "vpn_1", "eap_password")
+        except UciException:
+            pass
         response.content_type = "application/json"
-        return json.dumps({"vpn": {"account": {"username": username,
-                                               "password": password,
-                                               "registered": registered,
-                                               "renewal": renewal,
-                                               "expiry": expiry},
+        return json.dumps({"vpn": {"account": account,
+                                   "protocols": protocols,
                                    "locations": locations}}, sort_keys=True)
     except UciException:
         response.status = 400
@@ -73,8 +98,11 @@ def validate_credentials(credentials):
     """ validate credentials """
     valid = True
     try:
-        valid &= validate_option("string", credentials["account"]["username"])
-        valid &= validate_option("string", credentials["account"]["password"])
+        valid &= validate_option("string", credentials["account"]["openvpnUsername"])
+        valid &= validate_option("string", credentials["account"]["openvpnPassword"])
+        if VPN_APP.ipsec_on:
+            valid &= validate_option("string", credentials["account"]["ipsecUsername"])
+            valid &= validate_option("string", credentials["account"]["ipsecPassword"])
     except KeyError:
         valid = False
     return valid
@@ -82,8 +110,8 @@ def validate_credentials(credentials):
 
 @VPN_APP.put('/system/vpn')
 @jwt_auth_required
-def set_vpn(uci):
-    """sets the VPN credentials"""
+def set_vpn_credentials(uci):
+    """sets the OpenVPN and IPsec credentials"""
     try:
         credentials = dict(request.json)
         if not validate_credentials(credentials):
@@ -91,8 +119,9 @@ def set_vpn(uci):
             return "Empty or invalid content"
         try:
             with open("/etc/openvpn/login.auth", "w") as credentials_file:
-                credentials_file.write(f'{credentials["account"]["username"]}\n{credentials["account"]["password"]}')
-            uci.set_option(VPN_PKG, "active", "username", credentials["account"]["username"])
+                credentials_file.write(f'{credentials["account"]["openvpnUsername"]}\n'
+                                       f'{credentials["account"]["openvpnPassword"]}')
+            uci.set_option(VPN_PKG, "active", "username", credentials["account"]["openvpnUsername"])
             uci.set_option(VPN_PKG, "active", "registered", "unknown")
             uci.set_option(VPN_PKG, "active", "renewal", "unknown")
             uci.set_option(VPN_PKG, "active", "expiry", "unknown")
@@ -101,6 +130,16 @@ def set_vpn(uci):
         except (FileNotFoundError, IOError, UciException):
             response.status = 400
             return "Error writing credentials"
+        if VPN_APP.ipsec_on:
+            try:
+                for net in {"vpn_1", "vpn_2", "vpn_3", "vpn_4"}:
+                    uci.set_option(IPSEC_PKG, net, "eap_identity", credentials["account"]["ipsecUsername"])
+                    uci.set_option(IPSEC_PKG, net, "eap_password", credentials["account"]["ipsecPassword"])
+                uci.persist(IPSEC_PKG)
+                run(["/etc/init.d/ipsec", "restart"])
+            except (FileNotFoundError, IOError, UciException):
+                response.status = 400
+                return "Error writing IPsec credentials"
         return credentials
     except (JSONDecodeError, UciException):
         response.status = 400

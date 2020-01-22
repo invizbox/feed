@@ -31,7 +31,19 @@ ALL_OFF_PROFILE = {"ssh": {"enabled": False},
                        "enabled": False,
                        "blacklistIds": [],
                        "sites": []
+                   },
+                   "deviceAccess": {
+                       "enabled": False,
+                       "devices": []
                    }}
+NETWORK_MARKS = {"lan_vpn1": "1/1",
+                 "lan_vpn2": "2/2",
+                 "lan_vpn3": "4/4",
+                 "lan_vpn4": "8/8",
+                 "lan_tor": "16/16",
+                 "lan_clear1": "32/32",
+                 "lan_clear2": "64/64",
+                 "lan_local": "128/128"}
 LOGGER = logging.getLogger(__name__)
 
 PROFILES_APP = Bottle()
@@ -77,13 +89,21 @@ def validate_profile(updated_profile, uci):
             except StopIteration:
                 valid = False
         valid &= validate_option("string_list", updated_profile["siteBlocking"]["sites"])
+        valid &= isinstance(updated_profile["deviceAccess"], dict)
+        valid &= validate_option("boolean", updated_profile["deviceAccess"]["enabled"])
+        valid &= validate_option("string_list", updated_profile["deviceAccess"]["devices"])
+        for device_id in updated_profile["deviceAccess"]["devices"]:
+            try:
+                next(device for device in all_devices if device["id"] == device_id)
+            except StopIteration:
+                valid = False
     except KeyError:
         valid = False
     return valid
 
 
 def persist_profiles():
-    """ persiste the profiles to file """
+    """ persist the profiles to file """
     try:
         with open(PROFILES_APP.file, "w") as profiles_file:
             try:
@@ -104,6 +124,9 @@ def get_profiles():
                 PROFILES_APP.profiles = load(profiles_file)
         except (FileNotFoundError, IOError, JSONDecodeError):
             PROFILES_APP.profiles = {"profiles": []}
+        for profile in PROFILES_APP.profiles["profiles"]:
+            if "deviceAccess" not in profile:
+                profile["deviceAccess"] = ALL_OFF_PROFILE["deviceAccess"]
     return PROFILES_APP.profiles
 
 
@@ -130,13 +153,15 @@ def create_profile(uci):
             response.status = 400
             return "Empty or invalid content"
         profile["siteBlocking"]["sites"] = sorted(set(profile["siteBlocking"]["sites"]))
+        profile["deviceAccess"]["devices"] = sorted(set(profile["deviceAccess"]["devices"]))
         new_profile = {
             "id": uuid4().hex,
             "name": profile["name"],
             "type": profile["type"],
             "ssh": profile["ssh"],
             "deviceBlocking": profile["deviceBlocking"],
-            "siteBlocking": profile["siteBlocking"]
+            "siteBlocking": profile["siteBlocking"],
+            "deviceAccess": profile["deviceAccess"]
         }
         PROFILES_APP.profiles["profiles"].append(new_profile)
         persist_profiles()
@@ -156,9 +181,14 @@ def delete_profile(profile_id, uci):
         profile = next(profile for profile in profiles["profiles"] if profile["id"] == profile_id)
         associated_networks = [network["id"] for network in networks.get_networks(uci)
                                if network["profileId"] == profile["id"]]
+        reload_dropbear, reload_firewall = (False, False)
         for network_id in associated_networks:
-            update_profile_network(uci, network_id, profile, ALL_OFF_PROFILE)
+            reload_dropbear, reload_firewall = update_profile_network(uci, network_id, profile, ALL_OFF_PROFILE)
             uci.set_option(ADMIN_PKG, network_id, "profile_id", "")
+        if reload_dropbear:
+            run(["/etc/init.d/dropbear", "reload"])
+        if reload_firewall:
+            run(["/etc/init.d/firewall", "reload"])
         uci.persist(ADMIN_PKG)
         PROFILES_APP.profiles["profiles"].remove(profile)
         persist_profiles()
@@ -169,8 +199,8 @@ def delete_profile(profile_id, uci):
         return "Invalid Profile ID"
 
 
-def create_blocking_firewall(uci, network_id, mac_address, rule):
-    """helper function to create all firewall entries linked to a device"""
+def create_blocking_rule(uci, network_id, mac_address, rule):
+    """helper function to create a firewall rule linked to a device"""
     firewall_uci = uci.get_package(FIREWALL_PKG)
     zone = next(zone for zone in firewall_uci if zone[".type"] == "zone" and zone["network"] == network_id)
     new_rule = {".type": "rule",
@@ -179,13 +209,26 @@ def create_blocking_firewall(uci, network_id, mac_address, rule):
                 "src": zone["name"],
                 "dest": "*",
                 "src_mac": mac_address,
-                "target": "REJECT"}
+                "target": "REJECT",
+                "proto": "all"}
     if "startTime" in rule and "stopTime" in rule:
         new_rule["start_time"] = rule["startTime"]
         new_rule["stop_time"] = rule["stopTime"]
     if "days" in rule:
         new_rule["weekdays"] = " ".join(rule["days"])
     uci.add_config(FIREWALL_PKG, new_rule)
+
+
+def create_device_access_rule(uci, network_id, mac_address):
+    """ helper function to create a device access rule firewall rule """
+    device_access_rule = {".type": "rule",
+                          "id": uuid4().hex,
+                          "src_mac": mac_address,
+                          "set_mark": NETWORK_MARKS[network_id],
+                          "target": "MARK",
+                          "proto": "all",
+                          "src": "lan_all"}
+    uci.add_config(FIREWALL_PKG, device_access_rule)
 
 
 def rebuild_site_blocking(uci, network_id, profile):
@@ -217,25 +260,36 @@ def rebuild_site_blocking(uci, network_id, profile):
 
 def update_profile_network(uci, network_id, current_profile, new_profile):
     """ helper function which will change from the current profile to the new profile for a specific network """
+    reload_dropbear, reload_firewall = (False, False)
     if new_profile["ssh"] != current_profile["ssh"]:
         uci.set_option(SSH_PKG, network_id, "enable", "1" if new_profile["ssh"]["enabled"] else "0")
         uci.persist(SSH_PKG)
-        run(["/etc/init.d/dropbear", "reload"])
-    if new_profile["deviceBlocking"] != current_profile["deviceBlocking"]:
+        reload_dropbear = True
+    update_blocking = new_profile["deviceBlocking"] != current_profile["deviceBlocking"]
+    update_access = new_profile["deviceAccess"] != current_profile["deviceAccess"]
+    if update_blocking or update_access:
         for rule in uci.get_package(FIREWALL_PKG):
             if ".type" in rule and rule[".type"] == "rule" and "id" in rule and rule["id"]:
-                if "src" in rule and rule["src"] == network_id:
+                is_blocking_rule = update_blocking and "src" in rule and rule["src"] == network_id
+                is_access_rule = update_access and "set_mark" in rule and rule["set_mark"] == NETWORK_MARKS[network_id]
+                if is_blocking_rule or is_access_rule:
                     uci.delete_config(FIREWALL_PKG, rule["id"])
-        if new_profile["deviceBlocking"]["enabled"]:
+        if new_profile["deviceBlocking"]["enabled"] or new_profile["deviceAccess"]["enabled"]:
             all_devices = devices.get_devices(uci)
+        if update_blocking and new_profile["deviceBlocking"]["enabled"]:
             for device_id, rules in new_profile["deviceBlocking"]["deviceRules"].items():
                 device = next(device for device in all_devices if device["id"] == device_id)
                 for rule in rules:
-                    create_blocking_firewall(uci, network_id, device["macAddress"], rule)
+                    create_blocking_rule(uci, network_id, device["macAddress"], rule)
+        if update_access and new_profile["deviceAccess"]["enabled"]:
+            for device_id in sorted(set(new_profile["deviceAccess"]["devices"])):
+                device = next(device for device in all_devices if device["id"] == device_id)
+                create_device_access_rule(uci, network_id, device["macAddress"])
         uci.persist(FIREWALL_PKG)
-        run(["/etc/init.d/firewall", "reload"])
+        reload_firewall = True
     if new_profile["siteBlocking"] != current_profile["siteBlocking"]:
         rebuild_site_blocking(uci, network_id, new_profile)
+    return reload_dropbear, reload_firewall
 
 
 @PROFILES_APP.put('/profiles/<profile_id>')
@@ -251,14 +305,21 @@ def update_profile(profile_id, uci):
             return "Empty or invalid content"
         associated_networks = [network["id"] for network in networks.get_networks(uci)
                                if network["profileId"] == profile_id]
+        reload_dropbear, reload_firewall = (False, False)
         for network_id in associated_networks:
-            update_profile_network(uci, network_id, profile, updated_profile)
+            reload_dropbear, reload_firewall = update_profile_network(uci, network_id, profile, updated_profile)
+        if reload_dropbear:
+            run(["/etc/init.d/dropbear", "reload"])
+        if reload_firewall:
+            run(["/etc/init.d/firewall", "reload"])
         profile["name"] = updated_profile["name"]
         profile["type"] = updated_profile["type"]
         profile["ssh"] = updated_profile["ssh"]
         profile["deviceBlocking"] = updated_profile["deviceBlocking"]
         profile["siteBlocking"] = updated_profile["siteBlocking"]
         profile["siteBlocking"]["sites"] = sorted(set(updated_profile["siteBlocking"]["sites"]))
+        profile["deviceAccess"] = updated_profile["deviceAccess"]
+        profile["deviceAccess"]["devices"] = sorted(set(updated_profile["deviceAccess"]["devices"]))
         persist_profiles()
         return profile
     except StopIteration:
@@ -274,7 +335,8 @@ def delete_device_from_profiles(device_id):
     for profile in get_profiles()["profiles"]:
         try:
             del profile["deviceBlocking"]["deviceRules"][device_id]
-        except KeyError:
+            profile["deviceAccess"]["devices"].remove(device_id)
+        except (KeyError, ValueError):
             pass
     persist_profiles()
 

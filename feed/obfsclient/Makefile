@@ -19,12 +19,12 @@ PKG_INSTALL:=1
 include $(INCLUDE_DIR)/package.mk
 
 define Package/obfsclient
-  SECTION:=net
-  CATEGORY:=Network
-  SUBMENU:=Web Servers/Proxies
-  TITLE:=A pluggable transports proxy
-  URL:=https://github.com/Yawning/obfsclient
-  DEPENDS:=+libopenssl +glib2 +libstdcpp +libpthread +libevent2 +liballium
+	SECTION:=net
+	CATEGORY:=Network
+	SUBMENU:=Web Servers/Proxies
+	TITLE:=A pluggable transports proxy
+	URL:=https://github.com/Yawning/obfsclient
+	DEPENDS:=+libopenssl +glib2 +libstdcpp +libpthread +libevent2 +liballium
 endef
 
 define Package/obfsclient/description

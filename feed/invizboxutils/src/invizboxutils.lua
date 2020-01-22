@@ -100,10 +100,14 @@ function invizboxutils.s_post(url, content_type, body)
 end
 
 function invizboxutils.get_first_line(file)
-    local file_handle = assert(io.open(file, "r"))
-    local line = file_handle:read("*line")
-    file_handle:close()
-    return line
+    local file_handle = io.open(file, "r")
+    if file_handle then
+        local line = file_handle:read("*line")
+        file_handle:close()
+        return line
+    else
+        return ""
+    end
 end
 
 function invizboxutils.read_file(path, mode)
@@ -272,7 +276,7 @@ function invizboxutils.get_vpn_interfaces()
     return vpn_list
 end
 
-function invizboxutils.apply_vpn_config(some_uci, vpn_interface, tun_name)
+function invizboxutils.apply_vpn_config(some_uci, vpn_interface, tun_name, ipsec)
     local config_name = "vpn"
     some_uci:load(config_name)
     local selected_server = some_uci:get(config_name, "active", vpn_interface)
@@ -284,9 +288,16 @@ function invizboxutils.apply_vpn_config(some_uci, vpn_interface, tun_name)
             local template = some_uci:get(config_name, selected_server, "template")
             local address = some_uci:get(config_name, selected_server, "address")
             os.execute('sed "s/@SERVER_ADDRESS@/'..address..'/; s/@TUN@/'..tun_name..'/" '..template..' > '..tmp_file)
+            if ipsec then
+                some_uci:set("ipsec", vpn_interface, "gateway", address)
+            end
         elseif some_uci:get(config_name, selected_server, "filename") then
             local non_template_filename = some_uci:get(config_name, selected_server, "filename")
             os.execute('sed "s/@TUN@/'..tun_name..'/" '..non_template_filename..' > '..tmp_file)
+            if ipsec then
+                some_uci:set("ipsec", vpn_interface, "gateway", "invalid")
+                some_uci:set("ipsec", vpn_interface, "enabled", "0")
+            end
         end
         if os.execute("diff "..tmp_file.." "..final_filename.." >/dev/null")~=0 and
                 os.execute("cp "..tmp_file.." "..final_filename.. " >/dev/null") == 0 then
@@ -340,7 +351,8 @@ function invizboxutils.nearest_usable_vpn_server_to_uci(json_content)
             math.randomseed(os.time())
             for _, entry in pairs({"vpn", "vpn_1", "vpn_2", "vpn_3", "vpn_4"}) do
                 if uci:get(config_name, "active", entry) then
-                    uci:set(config_name, "active", entry, usable_servers[math.random(#usable_servers)])
+                    local random_server = usable_servers[math.random(#usable_servers)]
+                    uci:set(config_name, "active", entry, random_server)
                 end
             end
             return 0
@@ -356,18 +368,23 @@ function invizboxutils.get_nearest_cities(module)
         local json_content = invizboxutils.read_file("/tmp/nearest.json") or ""
         if string.match(json_content, ".*cities.*city.*city.*city.*") ~= nil
                 and string.match(json_content, ".*servers.*servers.*servers.*") ~= nil then
-            config_name = "vpn"
-            uci:load(config_name)
+            uci:load("vpn")
             invizboxutils.cities_to_uci(module, json_content)
             invizboxutils.nearest_usable_vpn_server_to_uci(json_content)
-            uci:save(config_name)
-            uci:commit(config_name)
-            -- notify rest-api and update openvpn configs
+            uci:save("vpn")
+            uci:commit("vpn")
+            -- notify rest-api and update vpn configs
             os.execute("kill -USR1 $(ps | grep [r]est_api | awk '{print $1}') 2>/dev/null")
+            local ipsec = uci:load("ipsec")
             for vpn_interface, tun_name in pairs(invizboxutils.get_vpn_interfaces()) do
-                invizboxutils.apply_vpn_config(uci, vpn_interface, tun_name)
+                invizboxutils.apply_vpn_config(uci, vpn_interface, tun_name, ipsec)
+            end
+            if ipsec then
+                uci:save("ipsec")
+                uci:commit("ipsec")
             end
             os.execute("/etc/init.d/openvpn restart")
+            os.execute("/etc/init.d/ipsec restart")
             invizboxutils.log("Got nearest VPN servers")
         else
             invizboxutils.log("Cannot identify nearest servers")

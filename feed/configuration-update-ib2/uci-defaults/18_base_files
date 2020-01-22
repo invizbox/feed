@@ -1,0 +1,681 @@
+#!/bin/ash
+
+# Copyright 2019 InvizBox Ltd
+#
+# Licensed under the InvizBox Shared License;
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#        https://www.invizbox.com/lic/license.txt
+
+. /lib/functions.sh
+function version { printf "%03d%03d%03d" $(echo "$1" | tr '.' ' '); }
+function replace_first { sed -i -e "1s/$1/$2/;t" -e "1,/$1/s//$2/" $3; }
+
+pre_update_version=$(uci get update.version.firmware)
+if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
+    # system
+    if [ "$(uci get system.system.hostname)" == "inviz.box" ]; then
+        uci set system.system.hostname=invizbox2
+        uci commit system
+    fi
+
+    # network
+    if [ -z $(uci get network.vpn2_to_vpn1) ]; then
+        uci set network.vpn2_to_vpn1=route
+        uci set network.vpn2_to_vpn1.interface=lan_vpn2
+        uci set network.vpn2_to_vpn1.target=10.154.1.0
+        uci set network.vpn2_to_vpn1.netmask=255.255.255.0
+        uci set network.vpn2_to_vpn1.gateway=0.0.0.0
+        uci set network.vpn2_to_vpn1.table=1
+
+        uci set network.vpn3_to_vpn1=route
+        uci set network.vpn3_to_vpn1.interface=lan_vpn3
+        uci set network.vpn3_to_vpn1.target=10.154.2.0
+        uci set network.vpn3_to_vpn1.netmask=255.255.255.0
+        uci set network.vpn3_to_vpn1.gateway=0.0.0.0
+        uci set network.vpn3_to_vpn1.table=1
+
+        uci set network.vpn4_to_vpn1=route
+        uci set network.vpn4_to_vpn1.interface=lan_vpn4
+        uci set network.vpn4_to_vpn1.target=10.154.3.0
+        uci set network.vpn4_to_vpn1.netmask=255.255.255.0
+        uci set network.vpn4_to_vpn1.gateway=0.0.0.0
+        uci set network.vpn4_to_vpn1.table=1
+
+        uci set network.tor_to_vpn1=route
+        uci set network.tor_to_vpn1.interface=lan_tor
+        uci set network.tor_to_vpn1.target=10.154.4.0
+        uci set network.tor_to_vpn1.netmask=255.255.255.0
+        uci set network.tor_to_vpn1.gateway=0.0.0.0
+        uci set network.tor_to_vpn1.table=1
+
+        uci set network.clear1_to_vpn1=route
+        uci set network.clear1_to_vpn1.interface=lan_clear1
+        uci set network.clear1_to_vpn1.target=10.154.5.0
+        uci set network.clear1_to_vpn1.netmask=255.255.255.0
+        uci set network.clear1_to_vpn1.gateway=0.0.0.0
+        uci set network.clear1_to_vpn1.table=1
+
+        uci set network.clear2_to_vpn1=route
+        uci set network.clear2_to_vpn1.interface=lan_clear2
+        uci set network.clear2_to_vpn1.target=10.154.6.0
+        uci set network.clear2_to_vpn1.netmask=255.255.255.0
+        uci set network.clear2_to_vpn1.gateway=0.0.0.0
+        uci set network.clear2_to_vpn1.table=1
+
+        uci set network.local_to_vpn1=route
+        uci set network.local_to_vpn1.interface=lan_local
+        uci set network.local_to_vpn1.target=10.154.7.0
+        uci set network.local_to_vpn1.netmask=255.255.255.0
+        uci set network.local_to_vpn1.gateway=0.0.0.0
+        uci set network.local_to_vpn1.table=1
+
+        uci set network.vpn1_to_vpn2=route
+        uci set network.vpn1_to_vpn2.interface=lan_vpn1
+        uci set network.vpn1_to_vpn2.target=10.154.0.0
+        uci set network.vpn1_to_vpn2.netmask=255.255.255.0
+        uci set network.vpn1_to_vpn2.gateway=0.0.0.0
+        uci set network.vpn1_to_vpn2.table=2
+
+        uci set network.vpn3_to_vpn2=route
+        uci set network.vpn3_to_vpn2.interface=lan_vpn3
+        uci set network.vpn3_to_vpn2.target=10.154.2.0
+        uci set network.vpn3_to_vpn2.netmask=255.255.255.0
+        uci set network.vpn3_to_vpn2.gateway=0.0.0.0
+        uci set network.vpn3_to_vpn2.table=2
+
+        uci set network.vpn4_to_vpn2=route
+        uci set network.vpn4_to_vpn2.interface=lan_vpn4
+        uci set network.vpn4_to_vpn2.target=10.154.3.0
+        uci set network.vpn4_to_vpn2.netmask=255.255.255.0
+        uci set network.vpn4_to_vpn2.gateway=0.0.0.0
+        uci set network.vpn4_to_vpn2.table=2
+
+        uci set network.tor_to_vpn2=route
+        uci set network.tor_to_vpn2.interface=lan_tor
+        uci set network.tor_to_vpn2.target=10.154.4.0
+        uci set network.tor_to_vpn2.netmask=255.255.255.0
+        uci set network.tor_to_vpn2.gateway=0.0.0.0
+        uci set network.tor_to_vpn2.table=2
+
+        uci set network.clear1_to_vpn2=route
+        uci set network.clear1_to_vpn2.interface=lan_clear1
+        uci set network.clear1_to_vpn2.target=10.154.5.0
+        uci set network.clear1_to_vpn2.netmask=255.255.255.0
+        uci set network.clear1_to_vpn2.gateway=0.0.0.0
+        uci set network.clear1_to_vpn2.table=2
+
+        uci set network.clear2_to_vpn2=route
+        uci set network.clear2_to_vpn2.interface=lan_clear2
+        uci set network.clear2_to_vpn2.target=10.154.6.0
+        uci set network.clear2_to_vpn2.netmask=255.255.255.0
+        uci set network.clear2_to_vpn2.gateway=0.0.0.0
+        uci set network.clear2_to_vpn2.table=2
+
+        uci set network.local_to_vpn2=route
+        uci set network.local_to_vpn2.interface=lan_local
+        uci set network.local_to_vpn2.target=10.154.7.0
+        uci set network.local_to_vpn2.netmask=255.255.255.0
+        uci set network.local_to_vpn2.gateway=0.0.0.0
+        uci set network.local_to_vpn2.table=2
+
+        uci set network.vpn1_to_vpn3=route
+        uci set network.vpn1_to_vpn3.interface=lan_vpn1
+        uci set network.vpn1_to_vpn3.target=10.154.0.0
+        uci set network.vpn1_to_vpn3.netmask=255.255.255.0
+        uci set network.vpn1_to_vpn3.gateway=0.0.0.0
+        uci set network.vpn1_to_vpn3.table=3
+
+        uci set network.vpn2_to_vpn3=route
+        uci set network.vpn2_to_vpn3.interface=lan_vpn2
+        uci set network.vpn2_to_vpn3.target=10.154.1.0
+        uci set network.vpn2_to_vpn3.netmask=255.255.255.0
+        uci set network.vpn2_to_vpn3.gateway=0.0.0.0
+        uci set network.vpn2_to_vpn3.table=3
+
+        uci set network.vpn4_to_vpn3=route
+        uci set network.vpn4_to_vpn3.interface=lan_vpn4
+        uci set network.vpn4_to_vpn3.target=10.154.3.0
+        uci set network.vpn4_to_vpn3.netmask=255.255.255.0
+        uci set network.vpn4_to_vpn3.gateway=0.0.0.0
+        uci set network.vpn4_to_vpn3.table=3
+
+        uci set network.tor_to_vpn3=route
+        uci set network.tor_to_vpn3.interface=lan_tor
+        uci set network.tor_to_vpn3.target=10.154.4.0
+        uci set network.tor_to_vpn3.netmask=255.255.255.0
+        uci set network.tor_to_vpn3.gateway=0.0.0.0
+        uci set network.tor_to_vpn3.table=3
+
+        uci set network.clear1_to_vpn3=route
+        uci set network.clear1_to_vpn3.interface=lan_clear1
+        uci set network.clear1_to_vpn3.target=10.154.5.0
+        uci set network.clear1_to_vpn3.netmask=255.255.255.0
+        uci set network.clear1_to_vpn3.gateway=0.0.0.0
+        uci set network.clear1_to_vpn3.table=3
+
+        uci set network.clear2_to_vpn3=route
+        uci set network.clear2_to_vpn3.interface=lan_clear2
+        uci set network.clear2_to_vpn3.target=10.154.6.0
+        uci set network.clear2_to_vpn3.netmask=255.255.255.0
+        uci set network.clear2_to_vpn3.gateway=0.0.0.0
+        uci set network.clear2_to_vpn3.table=3
+
+        uci set network.local_to_vpn3=route
+        uci set network.local_to_vpn3.interface=lan_local
+        uci set network.local_to_vpn3.target=10.154.7.0
+        uci set network.local_to_vpn3.netmask=255.255.255.0
+        uci set network.local_to_vpn3.gateway=0.0.0.0
+        uci set network.local_to_vpn3.table=3
+
+        uci set network.vpn1_to_vpn4=route
+        uci set network.vpn1_to_vpn4.interface=lan_vpn1
+        uci set network.vpn1_to_vpn4.target=10.154.0.0
+        uci set network.vpn1_to_vpn4.netmask=255.255.255.0
+        uci set network.vpn1_to_vpn4.gateway=0.0.0.0
+        uci set network.vpn1_to_vpn4.table=4
+
+        uci set network.vpn2_to_vpn4=route
+        uci set network.vpn2_to_vpn4.interface=lan_vpn2
+        uci set network.vpn2_to_vpn4.target=10.154.1.0
+        uci set network.vpn2_to_vpn4.netmask=255.255.255.0
+        uci set network.vpn2_to_vpn4.gateway=0.0.0.0
+        uci set network.vpn2_to_vpn4.table=4
+
+        uci set network.vpn3_to_vpn4=route
+        uci set network.vpn3_to_vpn4.interface=lan_vpn3
+        uci set network.vpn3_to_vpn4.target=10.154.2.0
+        uci set network.vpn3_to_vpn4.netmask=255.255.255.0
+        uci set network.vpn3_to_vpn4.gateway=0.0.0.0
+        uci set network.vpn3_to_vpn4.table=4
+
+        uci set network.tor_to_vpn4=route
+        uci set network.tor_to_vpn4.interface=lan_tor
+        uci set network.tor_to_vpn4.target=10.154.4.0
+        uci set network.tor_to_vpn4.netmask=255.255.255.0
+        uci set network.tor_to_vpn4.gateway=0.0.0.0
+        uci set network.tor_to_vpn4.table=4
+
+        uci set network.clear1_to_vpn4=route
+        uci set network.clear1_to_vpn4.interface=lan_clear1
+        uci set network.clear1_to_vpn4.target=10.154.5.0
+        uci set network.clear1_to_vpn4.netmask=255.255.255.0
+        uci set network.clear1_to_vpn4.gateway=0.0.0.0
+        uci set network.clear1_to_vpn4.table=4
+
+        uci set network.clear2_to_vpn4=route
+        uci set network.clear2_to_vpn4.interface=lan_clear2
+        uci set network.clear2_to_vpn4.target=10.154.6.0
+        uci set network.clear2_to_vpn4.netmask=255.255.255.0
+        uci set network.clear2_to_vpn4.gateway=0.0.0.0
+        uci set network.clear2_to_vpn4.table=4
+
+        uci set network.local_to_vpn4=route
+        uci set network.local_to_vpn4.interface=lan_local
+        uci set network.local_to_vpn4.target=10.154.7.0
+        uci set network.local_to_vpn4.netmask=255.255.255.0
+        uci set network.local_to_vpn4.gateway=0.0.0.0
+        uci set network.local_to_vpn4.table=4
+        uci commit network
+    fi
+
+    # firewall - where order matters
+    grep lan_all /etc/config/firewall -q
+    if [ "$?" -ne "0" ]; then
+        replace_first "config defaults$" "config defaults 'defaults'" /etc/config/firewall
+        replace_first "config rule$" "config rule 'dhcp_renew'" /etc/config/firewall
+        replace_first "config zone$" "config zone 'wan_zone'" /etc/config/firewall
+        replace_first "config zone$" "config zone 'vpn1_zone'" /etc/config/firewall
+        replace_first "config zone$" "config zone 'vpn2_zone'" /etc/config/firewall
+        replace_first "config zone$" "config zone 'vpn3_zone'" /etc/config/firewall
+        replace_first "config zone$" "config zone 'vpn4_zone'" /etc/config/firewall
+        replace_first "config zone$" "config zone 'tor_zone'" /etc/config/firewall
+        replace_first "config zone$" "config zone 'clear1_zone'" /etc/config/firewall
+        replace_first "config zone$" "config zone 'clear2_zone'" /etc/config/firewall
+        replace_first "config zone$" "config zone 'local_zone'" /etc/config/firewall
+        replace_first "config include$" "config include 'user_include'" /etc/config/firewall
+
+        uci set firewall.conntrack_all=rule
+        uci set firewall.conntrack_all.src=lan_all
+        uci set firewall.conntrack_all.dest=lan_all
+        uci set firewall.conntrack_all.extra='-m conntrack --ctstate NEW'
+        uci set firewall.conntrack_all.proto=all
+        uci set firewall.conntrack_all.target=ACCEPT
+        uci reorder firewall.conntrack_all=2
+
+        uci set firewall.all_to_vpn1=rule
+        uci set firewall.all_to_vpn1.src=lan_all
+        uci set firewall.all_to_vpn1.dest=lan_vpn1
+        uci set firewall.all_to_vpn1.mark=1
+        uci set firewall.all_to_vpn1.proto=all
+        uci set firewall.all_to_vpn1.target=ACCEPT
+        uci reorder firewall.all_to_vpn1=3
+
+        uci set firewall.vpn1_to_all=rule
+        uci set firewall.vpn1_to_all.src=lan_vpn1
+        uci set firewall.vpn1_to_all.dest=lan_all
+        uci set firewall.vpn1_to_all.mark=1
+        uci set firewall.vpn1_to_all.proto=all
+        uci set firewall.vpn1_to_all.target=ACCEPT
+        uci reorder firewall.vpn1_to_all=4
+
+        uci set firewall.all_to_vpn2=rule
+        uci set firewall.all_to_vpn2.src=lan_all
+        uci set firewall.all_to_vpn2.dest=lan_vpn2
+        uci set firewall.all_to_vpn2.mark=2
+        uci set firewall.all_to_vpn2.proto=all
+        uci set firewall.all_to_vpn2.target=ACCEPT
+        uci reorder firewall.all_to_vpn2=5
+
+        uci set firewall.vpn2_to_all=rule
+        uci set firewall.vpn2_to_all.src=lan_vpn2
+        uci set firewall.vpn2_to_all.dest=lan_all
+        uci set firewall.vpn2_to_all.mark=2
+        uci set firewall.vpn2_to_all.proto=all
+        uci set firewall.vpn2_to_all.target=ACCEPT
+        uci reorder firewall.vpn2_to_all=6
+
+        uci set firewall.all_to_vpn3=rule
+        uci set firewall.all_to_vpn3.src=lan_all
+        uci set firewall.all_to_vpn3.dest=lan_vpn3
+        uci set firewall.all_to_vpn3.mark=4
+        uci set firewall.all_to_vpn3.proto=all
+        uci set firewall.all_to_vpn3.target=ACCEPT
+        uci reorder firewall.all_to_vpn3=7
+
+        uci set firewall.vpn3_to_all=rule
+        uci set firewall.vpn3_to_all.src=lan_vpn3
+        uci set firewall.vpn3_to_all.dest=lan_all
+        uci set firewall.vpn3_to_all.mark=4
+        uci set firewall.vpn3_to_all.proto=all
+        uci set firewall.vpn3_to_all.target=ACCEPT
+        uci reorder firewall.vpn3_to_all=8
+
+        uci set firewall.all_to_vpn4=rule
+        uci set firewall.all_to_vpn4.src=lan_all
+        uci set firewall.all_to_vpn4.dest=lan_vpn4
+        uci set firewall.all_to_vpn4.mark=8
+        uci set firewall.all_to_vpn4.proto=all
+        uci set firewall.all_to_vpn4.target=ACCEPT
+        uci reorder firewall.all_to_vpn4=9
+
+        uci set firewall.vpn4_to_all=rule
+        uci set firewall.vpn4_to_all.src=lan_vpn4
+        uci set firewall.vpn4_to_all.dest=lan_all
+        uci set firewall.vpn4_to_all.mark=8
+        uci set firewall.vpn4_to_all.proto=all
+        uci set firewall.vpn4_to_all.target=ACCEPT
+        uci reorder firewall.vpn4_to_all=10
+
+        uci set firewall.all_to_tor=rule
+        uci set firewall.all_to_tor.src=lan_all
+        uci set firewall.all_to_tor.dest=lan_tor
+        uci set firewall.all_to_tor.mark=16
+        uci set firewall.all_to_tor.proto=all
+        uci set firewall.all_to_tor.target=ACCEPT
+        uci reorder firewall.all_to_tor=11
+
+        uci set firewall.tor_to_all=rule
+        uci set firewall.tor_to_all.src=lan_tor
+        uci set firewall.tor_to_all.dest=lan_all
+        uci set firewall.tor_to_all.mark=16
+        uci set firewall.tor_to_all.proto=all
+        uci set firewall.tor_to_all.target=ACCEPT
+        uci reorder firewall.tor_to_all=12
+
+        uci set firewall.all_to_clear1=rule
+        uci set firewall.all_to_clear1.src=lan_all
+        uci set firewall.all_to_clear1.dest=lan_clear1
+        uci set firewall.all_to_clear1.mark=32
+        uci set firewall.all_to_clear1.proto=all
+        uci set firewall.all_to_clear1.target=ACCEPT
+        uci reorder firewall.all_to_clear1=13
+
+        uci set firewall.clear1_to_all=rule
+        uci set firewall.clear1_to_all.src=lan_clear1
+        uci set firewall.clear1_to_all.dest=lan_all
+        uci set firewall.clear1_to_all.mark=32
+        uci set firewall.clear1_to_all.proto=all
+        uci set firewall.clear1_to_all.target=ACCEPT
+        uci reorder firewall.clear1_to_all=14
+
+        uci set firewall.all_to_clear2=rule
+        uci set firewall.all_to_clear2.src=lan_all
+        uci set firewall.all_to_clear2.dest=lan_clear2
+        uci set firewall.all_to_clear2.mark=64
+        uci set firewall.all_to_clear2.proto=all
+        uci set firewall.all_to_clear2.target=ACCEPT
+        uci reorder firewall.all_to_clear2=15
+
+        uci set firewall.clear2_to_all=rule
+        uci set firewall.clear2_to_all.src=lan_clear2
+        uci set firewall.clear2_to_all.dest=lan_all
+        uci set firewall.clear2_to_all.mark=64
+        uci set firewall.clear2_to_all.proto=all
+        uci set firewall.clear2_to_all.target=ACCEPT
+        uci reorder firewall.clear2_to_all=16
+
+        uci set firewall.all_to_local=rule
+        uci set firewall.all_to_local.src=lan_all
+        uci set firewall.all_to_local.dest=lan_local
+        uci set firewall.all_to_local.mark=128
+        uci set firewall.all_to_local.proto=all
+        uci set firewall.all_to_local.target=ACCEPT
+        uci reorder firewall.all_to_local=17
+
+        uci set firewall.local_to_all=rule
+        uci set firewall.local_to_all.src=lan_local
+        uci set firewall.local_to_all.dest=lan_all
+        uci set firewall.local_to_all.mark=128
+        uci set firewall.local_to_all.proto=all
+        uci set firewall.local_to_all.target=ACCEPT
+        uci reorder firewall.local_to_all=18
+
+        uci set firewall.all_zone=zone
+        uci set firewall.all_zone.input=ACCEPT
+        uci set firewall.all_zone.name=lan_all
+        uci add_list firewall.all_zone.network=lan_vpn1
+        uci add_list firewall.all_zone.network=lan_vpn2
+        uci add_list firewall.all_zone.network=lan_vpn3
+        uci add_list firewall.all_zone.network=lan_vpn4
+        uci add_list firewall.all_zone.network=lan_tor
+        uci add_list firewall.all_zone.network=lan_clear1
+        uci add_list firewall.all_zone.network=lan_clear2
+        uci add_list firewall.all_zone.network=lan_local
+        uci reorder firewall.all_zone=28
+        uci commit firewall
+
+        sed -i 's|-d 10.154.4.1|-d 10.154.0.1/21|' /etc/firewall.user
+        cat <<EOT >> /etc/firewall.user
+
+    # network device communication
+iptables -t mangle -A PREROUTING -m connmark ! --mark 0 -j CONNMARK --restore-mark -m comment --comment "!fw3 invizbox"
+iptables -t mangle -A FORWARD -m connmark ! --mark 0 -j ACCEPT -m comment --comment "!fw3 invizbox"
+iptables -t mangle -A FORWARD -o br-lan_vpn1 -j CONNMARK --save-mark --mask 1 -m comment --comment "!fw3 invizbox"
+iptables -t mangle -A FORWARD -o br-lan_vpn2 -j CONNMARK --save-mark --mask 2 -m comment --comment "!fw3 invizbox"
+iptables -t mangle -A FORWARD -o br-lan_vpn3 -j CONNMARK --save-mark --mask 4 -m comment --comment "!fw3 invizbox"
+iptables -t mangle -A FORWARD -o br-lan_vpn4 -j CONNMARK --save-mark --mask 8 -m comment --comment "!fw3 invizbox"
+iptables -t mangle -A FORWARD -o br-lan_tor -j CONNMARK --save-mark --mask 16 -m comment --comment "!fw3 invizbox"
+iptables -t mangle -A FORWARD -o br-lan_clear1 -j CONNMARK --save-mark --mask 32 -m comment --comment "!fw3 invizbox"
+iptables -t mangle -A FORWARD -o br-lan_clear2 -j CONNMARK --save-mark --mask 64 -m comment --comment "!fw3 invizbox"
+iptables -t mangle -A FORWARD -o br-lan_local -j CONNMARK --save-mark --mask 128 -m comment --comment "!fw3 invizbox"
+iptables -t mangle -A FORWARD -j CONNMARK --restore-mark -m comment --comment "!fw3 invizbox"
+
+EOT
+	fi
+    grep src_dport /etc/config/firewall -q
+    if [ "$?" -ne "0" ]; then
+        uci set firewall.dns_vpn1=redirect
+        uci set firewall.dns_vpn1.dest_ip=10.154.0.1
+        uci set firewall.dns_vpn1.dest_port=53
+        uci set firewall.dns_vpn1.src=lan_vpn1
+        uci set firewall.dns_vpn1.src_dport=53
+        uci set firewall.dns_vpn1.target=DNAT
+        uci reorder firewall.dns_vpn1=29
+
+        uci set firewall.dns_vpn2=redirect
+        uci set firewall.dns_vpn2.dest_ip=10.154.1.1
+        uci set firewall.dns_vpn2.dest_port=53
+        uci set firewall.dns_vpn2.src=lan_vpn2
+        uci set firewall.dns_vpn2.src_dport=53
+        uci set firewall.dns_vpn2.target=DNAT
+        uci reorder firewall.dns_vpn2=30
+
+        uci set firewall.dns_vpn3=redirect
+        uci set firewall.dns_vpn3.dest_ip=10.154.2.1
+        uci set firewall.dns_vpn3.dest_port=53
+        uci set firewall.dns_vpn3.src=lan_vpn3
+        uci set firewall.dns_vpn3.src_dport=53
+        uci set firewall.dns_vpn3.target=DNAT
+        uci reorder firewall.dns_vpn3=31
+
+        uci set firewall.dns_vpn4=redirect
+        uci set firewall.dns_vpn4.dest_ip=10.154.3.1
+        uci set firewall.dns_vpn4.dest_port=53
+        uci set firewall.dns_vpn4.src=lan_vpn4
+        uci set firewall.dns_vpn4.src_dport=53
+        uci set firewall.dns_vpn4.target=DNAT
+        uci reorder firewall.dns_vpn4=32
+
+        uci set firewall.dns_tor=redirect
+        uci set firewall.dns_tor.dest_ip=10.154.4.1
+        uci set firewall.dns_tor.dest_port=53
+        uci set firewall.dns_tor.src=lan_tor
+        uci set firewall.dns_tor.src_dport=53
+        uci set firewall.dns_tor.target=DNAT
+        uci reorder firewall.dns_tor=33
+
+        uci set firewall.dns_clear1=redirect
+        uci set firewall.dns_clear1.dest_ip=10.154.5.1
+        uci set firewall.dns_clear1.dest_port=53
+        uci set firewall.dns_clear1.src=lan_clear1
+        uci set firewall.dns_clear1.src_dport=53
+        uci set firewall.dns_clear1.target=DNAT
+        uci reorder firewall.dns_clear1=34
+
+        uci set firewall.dns_clear2=redirect
+        uci set firewall.dns_clear2.dest_ip=10.154.6.1
+        uci set firewall.dns_clear2.dest_port=53
+        uci set firewall.dns_clear2.src=lan_clear2
+        uci set firewall.dns_clear2.src_dport=53
+        uci set firewall.dns_clear2.target=DNAT
+        uci reorder firewall.dns_clear2=35
+
+        uci set firewall.dns_local=redirect
+        uci set firewall.dns_local.dest_ip=10.154.7.1
+        uci set firewall.dns_local.dest_port=53
+        uci set firewall.dns_local.src=lan_local
+        uci set firewall.dns_local.src_dport=53
+        uci set firewall.dns_local.target=DNAT
+        uci reorder firewall.dns_local=36
+        uci commit firewall
+    fi
+    grep tunnels /etc/config/firewall -q
+    if [ "$?" -ne "0" ]; then
+        uci set firewall.tunnels_zone=zone
+        uci set firewall.tunnels_zone.mtu_fix=1
+        uci set firewall.tunnels_zone.name=tunnels
+        uci add_list firewall.tunnels_zone.network=vpn_1
+        uci add_list firewall.tunnels_zone.network=vpn_2
+        uci add_list firewall.tunnels_zone.network=vpn_3
+        uci add_list firewall.tunnels_zone.network=vpn_4
+        uci reorder firewall.tunnels_zone=20
+        uci commit firewall
+	fi
+
+    #dhcp
+    grep classless-static-route /etc/config/dhcp -q
+    if [ "$?" -ne "0" ]; then
+        provider=$(uci get update.urls.nearest_cities | cut -d '/' -f 3)
+        dns_server1=10.255.255.1
+        dns_server2=10.255.255.2
+        if [ "${provider}" == "expressvpn" ] || [ "${provider}" == "vanishedvpn" ]; then
+            dns_server1=8.8.8.8
+            dns_server2=8.8.4.4
+        elif [ "${provider}" == "ipvanish" ]; then
+            dns_server1=198.18.0.1
+            dns_server2=198.18.0.2
+        elif [ "${provider}" == "nordvpn" ]; then
+            dns_server1=103.86.96.100
+            dns_server2=103.86.99.100
+        elif [ "${provider}" == "pia" ]; then
+            dns_server1=209.222.18.222
+            dns_server2=209.222.18.218
+        fi
+        uci add_list dhcp.invizbox.rebind_domain=vpn1
+        uci add_list dhcp.invizbox.rebind_domain=vpn2
+        uci add_list dhcp.invizbox.rebind_domain=vpn3
+        uci add_list dhcp.invizbox.rebind_domain=vpn4
+        uci add_list dhcp.invizbox.rebind_domain=tor
+        uci add_list dhcp.invizbox.rebind_domain=clear1
+        uci add_list dhcp.invizbox.rebind_domain=clear2
+        uci add_list dhcp.invizbox.rebind_domain=loc
+        uci add_list dhcp.invizbox.server=/vpn1/10.154.0.1
+        uci add_list dhcp.invizbox.server=/vpn2/10.154.1.1
+        uci add_list dhcp.invizbox.server=/vpn3/10.154.2.1
+        uci add_list dhcp.invizbox.server=/vpn4/10.154.3.1
+        uci add_list dhcp.invizbox.server=/tor/10.154.4.1
+        uci add_list dhcp.invizbox.server=/clear1/10.154.5.1
+        uci add_list dhcp.invizbox.server=/clear2/10.154.6.1
+        uci add_list dhcp.invizbox.server=/loc/10.154.7.1
+
+        uci add_list dhcp.vpn1.rebind_domain=vpn2
+        uci add_list dhcp.vpn1.rebind_domain=vpn3
+        uci add_list dhcp.vpn1.rebind_domain=vpn4
+        uci add_list dhcp.vpn1.rebind_domain=tor
+        uci add_list dhcp.vpn1.rebind_domain=clear1
+        uci add_list dhcp.vpn1.rebind_domain=clear2
+        uci add_list dhcp.vpn1.rebind_domain=loc
+        uci delete dhcp.vpn1.server
+        uci add_list dhcp.vpn1.server=/vpn2/10.154.1.1
+        uci add_list dhcp.vpn1.server=/vpn3/10.154.2.1
+        uci add_list dhcp.vpn1.server=/vpn4/10.154.3.1
+        uci add_list dhcp.vpn1.server=/tor/10.154.4.1
+        uci add_list dhcp.vpn1.server=/clear1/10.154.5.1
+        uci add_list dhcp.vpn1.server=/clear2/10.154.6.1
+        uci add_list dhcp.vpn1.server=/loc/10.154.7.1
+        uci add_list dhcp.vpn1.server="${dns_server1}@tun1"
+        uci add_list dhcp.vpn1.server="${dns_server2}@tun1"
+
+        uci add_list dhcp.vpn2.rebind_domain=vpn1
+        uci add_list dhcp.vpn2.rebind_domain=vpn3
+        uci add_list dhcp.vpn2.rebind_domain=vpn4
+        uci add_list dhcp.vpn2.rebind_domain=tor
+        uci add_list dhcp.vpn2.rebind_domain=clear1
+        uci add_list dhcp.vpn2.rebind_domain=clear2
+        uci add_list dhcp.vpn2.rebind_domain=loc
+        uci delete dhcp.vpn2.server
+        uci add_list dhcp.vpn2.server=/vpn1/10.154.0.1
+        uci add_list dhcp.vpn2.server=/vpn3/10.154.2.1
+        uci add_list dhcp.vpn2.server=/vpn4/10.154.3.1
+        uci add_list dhcp.vpn2.server=/tor/10.154.4.1
+        uci add_list dhcp.vpn2.server=/clear1/10.154.5.1
+        uci add_list dhcp.vpn2.server=/clear2/10.154.6.1
+        uci add_list dhcp.vpn2.server=/loc/10.154.7.1
+        uci add_list dhcp.vpn2.server="${dns_server1}@tun2"
+        uci add_list dhcp.vpn2.server="${dns_server2}@tun2"
+
+        uci add_list dhcp.vpn3.rebind_domain=vpn1
+        uci add_list dhcp.vpn3.rebind_domain=vpn2
+        uci add_list dhcp.vpn3.rebind_domain=vpn4
+        uci add_list dhcp.vpn3.rebind_domain=tor
+        uci add_list dhcp.vpn3.rebind_domain=clear1
+        uci add_list dhcp.vpn3.rebind_domain=clear2
+        uci add_list dhcp.vpn3.rebind_domain=loc
+        uci delete dhcp.vpn3.server
+        uci add_list dhcp.vpn3.server=/vpn1/10.154.0.1
+        uci add_list dhcp.vpn3.server=/vpn2/10.154.1.1
+        uci add_list dhcp.vpn3.server=/vpn4/10.154.3.1
+        uci add_list dhcp.vpn3.server=/tor/10.154.4.1
+        uci add_list dhcp.vpn3.server=/clear1/10.154.5.1
+        uci add_list dhcp.vpn3.server=/clear2/10.154.6.1
+        uci add_list dhcp.vpn3.server=/loc/10.154.7.1
+        uci add_list dhcp.vpn3.server="${dns_server1}@tun3"
+        uci add_list dhcp.vpn3.server="${dns_server2}@tun3"
+
+        uci add_list dhcp.vpn4.rebind_domain=vpn1
+        uci add_list dhcp.vpn4.rebind_domain=vpn2
+        uci add_list dhcp.vpn4.rebind_domain=vpn3
+        uci add_list dhcp.vpn4.rebind_domain=tor
+        uci add_list dhcp.vpn4.rebind_domain=clear1
+        uci add_list dhcp.vpn4.rebind_domain=clear2
+        uci add_list dhcp.vpn4.rebind_domain=loc
+        uci delete dhcp.vpn4.server
+        uci add_list dhcp.vpn4.server=/vpn1/10.154.0.1
+        uci add_list dhcp.vpn4.server=/vpn2/10.154.1.1
+        uci add_list dhcp.vpn4.server=/vpn3/10.154.2.1
+        uci add_list dhcp.vpn4.server=/tor/10.154.4.1
+        uci add_list dhcp.vpn4.server=/clear1/10.154.5.1
+        uci add_list dhcp.vpn4.server=/clear2/10.154.6.1
+        uci add_list dhcp.vpn4.server=/loc/10.154.7.1
+        uci add_list dhcp.vpn4.server="${dns_server1}@tun4"
+        uci add_list dhcp.vpn4.server="${dns_server2}@tun4"
+
+        uci add_list dhcp.tor.rebind_domain=vpn1
+        uci add_list dhcp.tor.rebind_domain=vpn2
+        uci add_list dhcp.tor.rebind_domain=vpn3
+        uci add_list dhcp.tor.rebind_domain=vpn4
+        uci add_list dhcp.tor.rebind_domain=clear1
+        uci add_list dhcp.tor.rebind_domain=clear2
+        uci add_list dhcp.tor.rebind_domain=loc
+        uci add_list dhcp.tor.server=/vpn1/10.154.0.1
+        uci add_list dhcp.tor.server=/vpn2/10.154.1.1
+        uci add_list dhcp.tor.server=/vpn3/10.154.2.1
+        uci add_list dhcp.tor.server=/vpn4/10.154.3.1
+        uci add_list dhcp.tor.server=/clear1/10.154.5.1
+        uci add_list dhcp.tor.server=/clear2/10.154.6.1
+        uci add_list dhcp.tor.server=/loc/10.154.7.1
+        uci set dhcp.tor.domain=tor
+        uci set dhcp.tor.local=/tor/
+
+        uci add_list dhcp.clear1.rebind_domain=vpn1
+        uci add_list dhcp.clear1.rebind_domain=vpn2
+        uci add_list dhcp.clear1.rebind_domain=vpn3
+        uci add_list dhcp.clear1.rebind_domain=vpn4
+        uci add_list dhcp.clear1.rebind_domain=tor
+        uci add_list dhcp.clear1.rebind_domain=clear2
+        uci add_list dhcp.clear1.rebind_domain=loc
+        uci add_list dhcp.clear1.server=/vpn1/10.154.0.1
+        uci add_list dhcp.clear1.server=/vpn2/10.154.1.1
+        uci add_list dhcp.clear1.server=/vpn3/10.154.2.1
+        uci add_list dhcp.clear1.server=/vpn4/10.154.3.1
+        uci add_list dhcp.clear1.server=/tor/10.154.4.1
+        uci add_list dhcp.clear1.server=/clear2/10.154.6.1
+        uci add_list dhcp.clear1.server=/loc/10.154.7.1
+        uci set dhcp.clear1.domain=clear1
+        uci set dhcp.clear1.local=/clear1/
+
+        uci add_list dhcp.clear2.rebind_domain=vpn1
+        uci add_list dhcp.clear2.rebind_domain=vpn2
+        uci add_list dhcp.clear2.rebind_domain=vpn3
+        uci add_list dhcp.clear2.rebind_domain=vpn4
+        uci add_list dhcp.clear2.rebind_domain=tor
+        uci add_list dhcp.clear2.rebind_domain=clear1
+        uci add_list dhcp.clear2.rebind_domain=loc
+        uci add_list dhcp.clear2.server=/vpn1/10.154.0.1
+        uci add_list dhcp.clear2.server=/vpn2/10.154.1.1
+        uci add_list dhcp.clear2.server=/vpn3/10.154.2.1
+        uci add_list dhcp.clear2.server=/vpn4/10.154.3.1
+        uci add_list dhcp.clear2.server=/tor/10.154.4.1
+        uci add_list dhcp.clear2.server=/clear1/10.154.5.1
+        uci add_list dhcp.clear2.server=/loc/10.154.7.1
+        uci set dhcp.clear2.domain=clear2
+        uci set dhcp.clear2.local=/clear2/
+
+        uci add_list dhcp.local.rebind_domain=vpn1
+        uci add_list dhcp.local.rebind_domain=vpn2
+        uci add_list dhcp.local.rebind_domain=vpn3
+        uci add_list dhcp.local.rebind_domain=vpn4
+        uci add_list dhcp.local.rebind_domain=tor
+        uci add_list dhcp.local.rebind_domain=clear1
+        uci add_list dhcp.local.rebind_domain=clear2
+        uci add_list dhcp.local.server=/vpn1/10.154.0.1
+        uci add_list dhcp.local.server=/vpn2/10.154.1.1
+        uci add_list dhcp.local.server=/vpn3/10.154.2.1
+        uci add_list dhcp.local.server=/vpn4/10.154.3.1
+        uci add_list dhcp.local.server=/tor/10.154.4.1
+        uci add_list dhcp.local.server=/clear1/10.154.5.1
+        uci add_list dhcp.local.server=/clear2/10.154.6.1
+        uci set dhcp.local.domain=loc
+        uci set dhcp.local.local=/loc/
+        uci del dhcp.local.port
+
+        uci add_list dhcp.lan_vpn1.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.0.1"
+        uci add_list dhcp.lan_vpn1.dhcp_option="option:domain-search,loc,vpn2,clear1,tor,clear2,vpn3,vpn4"
+        uci add_list dhcp.lan_vpn2.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.1.1"
+        uci add_list dhcp.lan_vpn2.dhcp_option="option:domain-search,vpn1,loc,clear1,tor,clear2,vpn3,vpn4"
+        uci add_list dhcp.lan_vpn3.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.2.1"
+        uci add_list dhcp.lan_vpn3.dhcp_option="option:domain-search,vpn1,loc,vpn2,clear1,tor,clear2,vpn4"
+        uci add_list dhcp.lan_vpn4.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.3.1"
+        uci add_list dhcp.lan_vpn4.dhcp_option="option:domain-search,vpn1,loc,vpn2,clear1,tor,clear2,vpn3"
+        uci add_list dhcp.lan_tor.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.4.1"
+        uci add_list dhcp.lan_tor.dhcp_option="option:domain-search,vpn1,loc,vpn2,clear1,clear2,vpn3,vpn4"
+        uci add_list dhcp.lan_clear1.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.5.1"
+        uci add_list dhcp.lan_clear1.dhcp_option="option:domain-search,vpn1,loc,vpn2,tor,clear2,vpn3,vpn4"
+        uci add_list dhcp.lan_clear2.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.6.1"
+        uci add_list dhcp.lan_clear2.dhcp_option="option:domain-search,vpn1,loc,vpn2,clear1,tor,vpn3,vpn4"
+        uci add_list dhcp.lan_local.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.7.1"
+        uci add_list dhcp.lan_local.dhcp_option="option:domain-search,vpn1,vpn2,clear1,tor,clear2,vpn3,vpn4"
+    fi
+fi

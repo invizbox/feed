@@ -1,0 +1,110 @@
+#!/bin/ash
+
+# Copyright 2019 InvizBox Ltd
+#
+# Licensed under the InvizBox Shared License;
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#        https://www.invizbox.com/lic/license.txt
+
+. /lib/functions.sh
+function version { printf "%03d%03d%03d" $(echo "$1" | tr '.' ' '); }
+
+pre_update_version=$(uci get update.version.firmware)
+if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
+    provider=$(uci get update.urls.nearest_cities | cut -d '/' -f 3)
+    config_load admin-interface
+    uci set admin-interface.features=service
+    if [ -z $(uci get admin-interface.features.onboarding_needed) ]; then
+        local feature
+        config_get feature onboarding needed "true"
+        uci set admin-interface.features.onboarding_needed=$feature
+    fi
+    if [ "${provider}" == "expressvpn" ]; then
+        uci set admin-interface.features.ipsec_credentials_url='https://www.expressvpn.com/setup#manual'
+        uci set admin-interface.features.openvpn_credentials_url='https://www.expressvpn.com/setup#manual'
+        uci set admin-interface.features.separate_ipsec_credentials='false'
+        uci set admin-interface.features.support_email=''
+        uci set admin-interface.features.support_url=''
+        uci set admin-interface.features.vpn_from_account='false'
+        uci set admin-interface.features.vpn_status='false'
+        uci set admin-interface.lan_vpn1.protocol_id=openvpn_udp_1195
+        uci set admin-interface.lan_vpn2.protocol_id=openvpn_udp_1195
+        uci set admin-interface.lan_vpn3.protocol_id=openvpn_udp_1195
+        uci set admin-interface.lan_vpn4.protocol_id=openvpn_udp_1195
+    elif [ "${provider}" == "invizbox" ]; then
+        uci set admin-interface.features.ipsec_credentials_url='https://shop.invizbox.com/dashboard/vpn-account'
+        uci set admin-interface.features.openvpn_credentials_url='https://shop.invizbox.com/dashboard/vpn-account'
+        uci set admin-interface.features.separate_ipsec_credentials='false'
+        uci set admin-interface.features.support_email='support@invizbox.com'
+        uci set admin-interface.features.support_url='https://support.invizbox.com/hc/en-us/categories/360000002314'
+        uci set admin-interface.features.vpn_from_account='false'
+        uci set admin-interface.features.vpn_status='true'
+        uci set admin-interface.lan_vpn1.protocol_id=openvpn_tcp_443
+        uci set admin-interface.lan_vpn2.protocol_id=openvpn_tcp_443
+        uci set admin-interface.lan_vpn3.protocol_id=openvpn_tcp_443
+        uci set admin-interface.lan_vpn4.protocol_id=openvpn_tcp_443
+    elif [ "${provider}" == "ipvanish" ]; then
+        uci set admin-interface.features.ipsec_credentials_url='https://account.ipvanish.com'
+        uci set admin-interface.features.openvpn_credentials_url='https://account.ipvanish.com'
+        uci set admin-interface.features.separate_ipsec_credentials='false'
+        uci set admin-interface.features.support_email=''
+        uci set admin-interface.features.support_url=''
+        uci set admin-interface.features.vpn_from_account='true'
+        uci set admin-interface.features.vpn_status='false'
+        uci set admin-interface.lan_vpn1.protocol_id=openvpn_tcp_443
+        uci set admin-interface.lan_vpn2.protocol_id=openvpn_tcp_443
+        uci set admin-interface.lan_vpn3.protocol_id=openvpn_tcp_443
+        uci set admin-interface.lan_vpn4.protocol_id=openvpn_tcp_443
+    elif [ "${provider}" == "nordvpn" ]; then
+        uci set admin-interface.features.ipsec_credentials_url='https://ucp.nordvpn.com/dashboard'
+        uci set admin-interface.features.openvpn_credentials_url='https://ucp.nordvpn.com/dashboard'
+        uci set admin-interface.features.separate_ipsec_credentials='false'
+        uci set admin-interface.features.support_email=''
+        uci set admin-interface.features.support_url=''
+        uci set admin-interface.features.vpn_from_account='true'
+        uci set admin-interface.features.vpn_status='false'
+        uci set admin-interface.lan_vpn1.protocol_id=openvpn_tcp_443
+        uci set admin-interface.lan_vpn2.protocol_id=openvpn_tcp_443
+        uci set admin-interface.lan_vpn3.protocol_id=openvpn_tcp_443
+        uci set admin-interface.lan_vpn4.protocol_id=openvpn_tcp_443
+    elif [ "${provider}" == "pia" ]; then
+        uci set admin-interface.features.ipsec_credentials_url='https://www.privateinternetaccess.com/pages/client-control-panel'
+        uci set admin-interface.features.openvpn_credentials_url='https://www.privateinternetaccess.com/pages/client-control-panel'
+        uci set admin-interface.features.separate_ipsec_credentials='false'
+        uci set admin-interface.features.support_email=''
+        uci set admin-interface.features.support_url=''
+        uci set admin-interface.features.vpn_from_account='true'
+        uci set admin-interface.features.vpn_status='false'
+        uci set admin-interface.lan_vpn1.protocol_id=openvpn_tcp_501
+        uci set admin-interface.lan_vpn2.protocol_id=openvpn_tcp_501
+        uci set admin-interface.lan_vpn3.protocol_id=openvpn_tcp_501
+        uci set admin-interface.lan_vpn4.protocol_id=openvpn_tcp_501
+    elif [ "${provider}" == "vanishedvpn" ]; then
+        uci set admin-interface.features.ipsec_credentials_url='https://www.vanishedvpn.com/my-account'
+        uci set admin-interface.features.openvpn_credentials_url='https://www.vanishedvpn.com/my-account'
+        uci set admin-interface.features.separate_ipsec_credentials='false'
+        uci set admin-interface.features.support_email='support@vanishedvpn.com'
+        uci set admin-interface.features.support_url='http://help.vanishedvpn.com'
+        uci set admin-interface.features.vpn_from_account='true'
+        uci set admin-interface.features.vpn_status='false'
+        uci set admin-interface.lan_vpn1.protocol_id=openvpn_udp_1194
+        uci set admin-interface.lan_vpn2.protocol_id=openvpn_udp_1194
+        uci set admin-interface.lan_vpn3.protocol_id=openvpn_udp_1194
+        uci set admin-interface.lan_vpn4.protocol_id=openvpn_udp_1194
+    elif [ "${provider}" == "windscribe" ]; then
+        uci set admin-interface.features.ipsec_credentials_url='https://windscribe.com/getconfig/openvpn'
+        uci set admin-interface.features.openvpn_credentials_url='https://windscribe.com/getconfig/openvpn'
+        uci set admin-interface.features.separate_ipsec_credentials='true'
+        uci set admin-interface.features.support_email=''
+        uci set admin-interface.features.support_url=''
+        uci set admin-interface.features.vpn_from_account='false'
+        uci set admin-interface.features.vpn_status='false'
+        uci set admin-interface.lan_vpn1.protocol_id=openvpn_tcp_443
+        uci set admin-interface.lan_vpn2.protocol_id=openvpn_tcp_443
+        uci set admin-interface.lan_vpn3.protocol_id=openvpn_tcp_443
+        uci set admin-interface.lan_vpn4.protocol_id=openvpn_tcp_443
+    fi
+    uci commit admin-interface
+fi

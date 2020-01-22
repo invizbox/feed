@@ -31,6 +31,11 @@ def upload_firmware():
         return 'File extension must be ".bin"'
     upload.filename = "firmware.img.gz"
     upload.save("/tmp", overwrite=True, chunk_size=CHUNK_SIZE)
+    if system("gunzip -c /tmp/firmware.img.gz > /tmp/firmware.img") != 0 \
+       or system("/sbin/sysupgrade --test /tmp/firmware.img > /tmp/sysupgrade_test.txt") != 0 \
+            or system("grep -q 'Invalid partition table on ' /tmp/sysupgrade_test.txt") == 0:
+        response.status = 422
+        return 'Uploaded file is not a valid InvizBox 2 firmware.'
     sha256_handler_ = sha256()
     with open("/tmp/firmware.img.gz", 'rb') as firmware_file:
         for block in iter(lambda: firmware_file.read(CHUNK_SIZE), b''):

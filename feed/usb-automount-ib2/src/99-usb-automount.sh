@@ -40,6 +40,19 @@ write_vpn_credentials () {
     return 1
 }
 
+write_ipsec_credentials () {
+    ipsec_file="/export/${mntpnt}/ipsec_credentials.txt"
+    if [ -f "${ipsec_file}" ]; then
+        logger "Found an IPSec credentials file"
+        read ipsec_username ipsec_password < "${ipsec_file}"
+        echo -n "${ipsec_username} ${ipsec_password}"  > /private/ipsec_credentials.txt
+        echo ${ipsec_username} ${ipsec_password} >> "/export/${mntpnt}/written_ipsec_cred.txt"
+        sed -i '1d' "${ipsec_file}"
+        return 0
+    fi
+    return 1
+}
+
 perform_reset() {
     reset_file="/export/${mntpnt}/reset.txt"
     if [ -f "${reset_file}" ]; then
@@ -74,6 +87,8 @@ if [ ${basename} != "block" ] && [ -z "${device##sd*}" ]; then
             flash_password=$?
             write_vpn_credentials
             flash_vpn=$?
+            write_ipsec_credentials
+            flash_vpn=$(( $? || ${flash_vpn} ))
             sync
             if [ "${flash_password}" -eq "0" ] && [ "${flash_vpn}" -eq "0" ]; then
                 led_info_on

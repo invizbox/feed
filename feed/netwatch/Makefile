@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=netwatch
 PKG_VERSION:=1.2
-PKG_RELEASE:=3
+PKG_RELEASE:=4
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/netwatch
 
@@ -54,7 +54,7 @@ endef
 
 define Package/netwatch-base/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/*  $(1)/usr/lib/lua/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/* $(1)/usr/lib/lua/
 	$(INSTALL_DIR) $(1)/
 	$(CP) $(PKG_BUILD_DIR)/root/* $(1)/
 endef
@@ -63,7 +63,7 @@ define Package/netwatch-base/preinst
 #!/bin/sh
 # check if we are on real system
 if [ -z "$${IPKG_INSTROOT}" ]; then
-    cp /etc/config/devices /tmp/devices
+	cp /etc/config/devices /tmp/devices
 	ln -sf /tmp/resolv.conf /etc/resolv.conf
 fi
 exit 0
@@ -74,8 +74,8 @@ define Package/netwatch-base/postinst
 touch $${IPKG_INSTROOT}/etc/config/devices
 # check if we are on real system
 if [ -z "$${IPKG_INSTROOT}" ]; then
-    echo "Restoring known devices"
-    cp /tmp/devices /etc/config/devices
+	echo "Restoring known devices"
+	cp /tmp/devices /etc/config/devices
 	echo "Enabling rc.d symlink for netwatch"
 	/etc/init.d/netwatch enable
 fi

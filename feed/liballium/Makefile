@@ -20,10 +20,10 @@ PKG_INSTALL:=1
 include $(INCLUDE_DIR)/package.mk
 
 define Package/liballium
-  SECTION:=libs
-  CATEGORY:=Libraries
-  TITLE:=A pluggable transports library
-  URL:=https://github.com/Yawning/liballium
+	SECTION:=libs
+	CATEGORY:=Libraries
+	TITLE:=A pluggable transports library
+	URL:=https://github.com/Yawning/liballium
 endef
 
 define Package/liballium/description

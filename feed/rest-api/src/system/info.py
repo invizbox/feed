@@ -47,22 +47,13 @@ def get_generic_info(uci, uci_rom):
             new_firmware_version = uci.get_option(UPDATE_PKG, "version", "new_firmware") or "unknown"
         except UciException:
             new_firmware_version = "unknown"
-        try:
-            support_url = uci.get_option(UPDATE_PKG, "urls", "support_url")
-        except UciException:
-            support_url = ""
-        try:
-            support_email = uci.get_option(UPDATE_PKG, "urls", "support_email")
-        except UciException:
-            support_email = ""
         return {"info": {"currentFirmware": firmware_version,
                          "resetFirmware": rom_firmware_version,
                          "newFirmware": new_firmware_version,
                          "kernel": system_json["kernel"],
                          "hostName": system_json["hostname"],
                          "model": system_json["model"],
-                         "ports": ["1", "2", "3", "4"] if "Pro" in system_json["model"] else ["LAN"],
-                         "support": {"url": support_url, "email": support_email}}}
+                         "ports": ["1", "2", "3", "4"] if "Pro" in system_json["model"] else ["LAN"]}}
     except JSONDecodeError:
         response.status = 400
         return "Error getting information"

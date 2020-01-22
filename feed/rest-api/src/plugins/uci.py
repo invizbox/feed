@@ -136,7 +136,7 @@ class Uci:
     def build_option_string(config, ):
         """ builds up a string to represent a config in UCI format """
         if config['id']:
-            show_string = f"config {config['.type']} {config['id']}\n"
+            show_string = f"config {config['.type']} '{config['id']}'\n"
         else:
             show_string = f"config {config['.type']}\n"
         for option_name, option_value in sorted(config.items()):

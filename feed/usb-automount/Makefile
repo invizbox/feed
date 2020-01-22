@@ -26,7 +26,7 @@ endef
 
 define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/block
-	$(CP) ./src/99-usb-automount.sh  $(1)/etc/hotplug.d/block/
+	$(CP) ./src/99-usb-automount.sh $(1)/etc/hotplug.d/block/
 endef
 
 $(eval $(call BuildPackage,$(PKG_NAME)))

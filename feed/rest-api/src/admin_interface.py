@@ -45,14 +45,14 @@ def validate_ftux(ftux):
     return valid
 
 
-def validate_onboarding(onboarding):
-    """ validate the onboarding object """
-    valid = True
+def validate_features(features):
+    """ validate the features object """
+    onboarding_needed = True
     try:
-        valid &= validate_option("boolean", onboarding["onboarding"])
-    except KeyError:
-        valid = False
-    return valid
+        onboarding_needed &= validate_option("boolean", features["onboarding"]["needed"])
+    except (KeyError, TypeError):
+        onboarding_needed = False
+    return onboarding_needed
 
 
 @ADMIN_INTERFACE_APP.get('/ping')
@@ -62,18 +62,6 @@ def ping():
         response.status = 204
     else:
         response.status = 503
-
-
-@ADMIN_INTERFACE_APP.get('/admin_interface/features')
-@jwt_auth_required
-def get_features(uci):
-    """gets a list of features for the Administration Interface"""
-    try:
-        vpn_status = uci.get_option(ADMIN_PKG, "features", "vpn_status") == "true"
-        return {"vpnStatus": vpn_status}
-    except UciException:
-        response.status = 400
-        return "Unable to get features for the admin-interface"
 
 
 @ADMIN_INTERFACE_APP.get('/admin_interface/ftux')
@@ -106,30 +94,60 @@ def set_ftux(uci):
         return "Error setting ftux in configuration"
 
 
-@ADMIN_INTERFACE_APP.get('/admin_interface/onboarding')
-def get_onboarding(uci):
-    """gets whether or not onboarding is needed in the Administration Interface"""
+@ADMIN_INTERFACE_APP.get('/admin_interface/features')
+def get_features(uci):
+    """gets a list of features for the Administration Interface"""
     try:
+        openvpn_credentials_url = uci.get_option(ADMIN_PKG, "features", "openvpn_credentials_url")
+        ipsec_credentials_url = uci.get_option(ADMIN_PKG, "features", "ipsec_credentials_url")
+        onboarding_nedeed = uci.get_option(ADMIN_PKG, "features", "onboarding_needed") == "true"
+        separate_ipsec_credentials = uci.get_option(ADMIN_PKG, "features", "separate_ipsec_credentials") == "true"
+        ipsec_credentials_needed = not path.isfile("/private/ipsec_credentials.txt")
         vpn_credentials_needed = not path.isfile("/private/vpn_credentials.txt")
+        try:
+            support_url = uci.get_option(ADMIN_PKG, "features", "support_url")
+        except UciException:
+            support_url = ''
+        try:
+            support_email = uci.get_option(ADMIN_PKG, "features", "support_email")
+        except UciException:
+            support_email = ''
+        vpn_from_account = uci.get_option(ADMIN_PKG, "features", "vpn_from_account") == "true"
+        vpn_status = uci.get_option(ADMIN_PKG, "features", "vpn_status") == "true"
         return {
-            'onboarding': uci.get_option(ADMIN_PKG, "onboarding", "needed") == "true",
-            "vpnCredentials": vpn_credentials_needed
+            "ipsecCredentialsUrl": ipsec_credentials_url,
+            'onboarding': {
+                "ipsecCredentials": ipsec_credentials_needed,
+                "needed": onboarding_nedeed,
+                "vpnCredentials": vpn_credentials_needed
+            },
+            "openvpnCredentialsUrl": openvpn_credentials_url,
+            "separateIpsecCredentials": separate_ipsec_credentials,
+            "support": {
+                "url": support_url,
+                "email": support_email
+            },
+            "vpnFromAccount": vpn_from_account,
+            "vpnStatus": vpn_status
         }
     except UciException:
         response.status = 400
         return "Error with admin-interface config"
 
 
-@ADMIN_INTERFACE_APP.put('/admin_interface/onboarding')
+@ADMIN_INTERFACE_APP.put('/admin_interface/features')
 @jwt_auth_required
-def set_onboarding(uci):
-    """ updates whether or not onboarding is needed in the Administration Interface"""
+def set_features(uci):
+    """ updates whether or not the onboarding feature is still needed in the Administration Interface"""
     try:
-        updated_onboarding = dict(request.json)
-        validate_onboarding(updated_onboarding)
-        uci.set_option(ADMIN_PKG, "onboarding", "needed", "true" if updated_onboarding["onboarding"] else "false")
-        uci.persist(ADMIN_PKG)
-        return updated_onboarding
+        updated_features = dict(request.json)
+        if validate_features(updated_features):
+            onboarding_needed = "true" if updated_features["onboarding"]["needed"] else "false"
+            uci.set_option(ADMIN_PKG, "features", "onboarding_needed", onboarding_needed)
+            uci.persist(ADMIN_PKG)
+            return updated_features
+        response.status = 400
+        return "Invalid features"
     except (JSONDecodeError, KeyError, UciException):
         response.status = 404
         return "Unable to update onboarding in admin-interface"

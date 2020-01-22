@@ -1,0 +1,4 @@
+#!/bin/ash
+
+. /bin/ledcontrol.ash
+led_info_off

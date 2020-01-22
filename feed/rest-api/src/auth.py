@@ -42,7 +42,7 @@ def access_token(uci):
         token_cookie = next(value for name, value in request.cookies.iteritems() if name.startswith("api_refresh"))  # pylint: disable=no-member
         try:
             client_ip = request.environ.get('REMOTE_ADDR')
-            devices = get_devices(uci)
+            devices = get_devices(uci, True)
             device_id = next(device["id"] for device in devices
                              if "ipAddress" in device and device["ipAddress"] == client_ip)
         except StopIteration:
@@ -99,7 +99,7 @@ def new_refresh_token(uci):
     try:
         client_ip = request.environ.get('REMOTE_ADDR')
         host = request.environ.get('HTTP_HOST')
-        devices = get_devices(uci)
+        devices = get_devices(uci, True)
         try:
             device_id = next(device["id"] for device in devices
                              if "ipAddress" in device and device["ipAddress"] == client_ip)

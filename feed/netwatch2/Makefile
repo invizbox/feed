@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=netwatch2
 PKG_VERSION:=0.2
-PKG_RELEASE:=1
+PKG_RELEASE:=3
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 
@@ -26,7 +26,7 @@ endef
 
 define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua
-	$(INSTALL_BIN) ./src/*  $(1)/usr/lib/lua/
+	$(INSTALL_BIN) ./src/* $(1)/usr/lib/lua/
 	$(INSTALL_DIR) $(1)/
 	$(CP) ./root/* $(1)/
 endef

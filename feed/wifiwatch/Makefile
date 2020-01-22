@@ -26,7 +26,7 @@ endef
 
 define Package/wifiwatch/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua
-	$(INSTALL_BIN) ./src/*  $(1)/usr/lib/lua/
+	$(INSTALL_BIN) ./src/* $(1)/usr/lib/lua/
 	$(INSTALL_DIR) $(1)/
 	$(CP) ./root/* $(1)/
 endef
@@ -35,8 +35,8 @@ define Package/wifiwatch/preinst
 #!/bin/sh
 # check if we are on real system
 if [ -z "$${IPKG_INSTROOT}" ]; then
-    echo "Saving known networks"
-    cp /etc/config/known_networks /tmp/known_networks
+	echo "Saving known networks"
+	cp /etc/config/known_networks /tmp/known_networks
 fi
 exit 0
 endef
@@ -47,8 +47,8 @@ echo "touch known_networks if needed"
 touch $${IPKG_INSTROOT}/etc/config/known_networks
 # check if we are on real system
 if [ -z "$${IPKG_INSTROOT}" ]; then
-    echo "Restoring known networks"
-    cp /tmp/known_networks /etc/config/known_networks
+	echo "Restoring known networks"
+	cp /tmp/known_networks /etc/config/known_networks
 	echo "Enabling rc.d symlink for wifiwatch"
 	/etc/init.d/wifiwatch enable
 fi

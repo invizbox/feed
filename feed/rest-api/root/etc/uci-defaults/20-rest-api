@@ -8,10 +8,11 @@
 #
 #        https://www.invizbox.com/lic/license.txt
 
-. /bin/ledcontrol.ash
-led_info_off
+. /lib/functions.sh
+function version { printf "%03d%03d%03d" $(echo "$1" | tr '.' ' '); }
 
-if [ ! -s /etc/lighttpd/inviz.box.pem ]; then
+openssl x509 -in /etc/lighttpd/inviz.box.pem -noout 2>/dev/null
+if [ $? -ne 0 ]; then
     openssl req \
     -x509 \
     -config /etc/openssl-inviz.box.config \
@@ -27,4 +28,63 @@ fi
 
 if [ ! -s /etc/jwt_secret ]; then
     dd if=/dev/urandom skip=0 count=32 bs=1 | hexdump -e '"%x"' > /etc/jwt_secret
+fi
+
+pre_update_version=$(uci get update.version.firmware)
+if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
+    # add protocol IDs if needed (from IPSec onwards)
+    protocol_id=openvpn_tcp_443
+    ip_protocol=TCP
+    port=443
+    provider=$(uci get update.urls.nearest_cities | cut -d '/' -f 3)
+    if [ "${provider}" == "expressvpn" ]; then
+        protocol_id=openvpn_udp_1195
+        ip_protocol=UDP
+        port=1195
+    elif [ "${provider}" == "pia" ]; then
+        protocol_id=openvpn_tcp_501
+        ip_protocol=TCP
+        port=501
+    elif [ "${provider}" == "vanishedvpn" ]; then
+        protocol_id=openvpn_udp_1194
+        ip_protocol=UDP
+        port=1194
+    fi
+
+    get_first_protocol_id()
+    {
+        if [ "$real_protocol_id" == "default" ]; then
+            real_protocol_id="$1"
+        fi
+    }
+
+    set_protocol_id_if_missing()
+    {
+        local id
+        config_get id "$1" "protocol_id" "missing"
+        if [ "$id" == "missing" ]; then
+            uci add_list vpn.$1.protocol_id=$protocol_id
+            if [ "${provider}" == "windscribe" ]; then
+                uci add_list vpn.$1.protocol_id=ikev2_ipsec
+            fi
+        fi
+    }
+
+    config_load vpn
+    real_protocol_id="default"
+    config_foreach get_first_protocol_id protocol
+    if [ "$real_protocol_id" == "default" ]; then
+        uci set vpn.$protocol_id=protocol
+        uci set vpn.$protocol_id.vpn_protocol=OpenVPN
+        uci set vpn.$protocol_id.ip_protocol=$ip_protocol
+        uci set vpn.$protocol_id.port=$port
+        if [ "${provider}" == "windscribe" ]; then
+            uci set vpn.ikev2_ipsec=protocol
+            uci set vpn.ikev2_ipsec.vpn_protocol=IKEv2
+            uci set vpn.ikev2_ipsec.ip_protocol=IPsec
+            uci set vpn.ikev2_ipsec.port=50
+        fi
+    fi
+    config_foreach set_protocol_id_if_missing server
+    uci commit vpn
 fi

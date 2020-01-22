@@ -285,11 +285,6 @@ function netwatch.use_extend()
             '--ctstate NEW,RELATED,ESTABLISHED -j ACCEPT -m comment --comment "invizbox"')
     -- waiting
     while netwatch.running do
-        if netwatch.check_captive_portal() then
-            utils.log("we're behind a captive portal")
-            netwatch.captive_portal()
-            break
-        end
         netwatch.running = netwatch.keep_running()
         utils.sleep(20)
     end

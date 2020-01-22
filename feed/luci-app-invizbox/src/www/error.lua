@@ -6,31 +6,31 @@
 local uri = os.getenv("REQUEST_URI")
 local user_agent = os.getenv("HTTP_USER_AGENT")
 
-if string.sub(user_agent, 1, 21) == "CaptiveNetworkSupport" then -- IOS
+if user_agent and string.sub(user_agent, 1, 21) == "CaptiveNetworkSupport" then -- IOS
     print("Status: 200 OK")
     print("Content-Type: text/html")
     print("Content-Length: 68")
     print("Cache-Control: max-age=300")
     print("")
     io.write("<HTML><HEAD><TITLE>Success</TITLE></HEAD><BODY>Success</BODY></HTML>")
-elseif uri == "/generate_204" or uri == "/gen_204" then -- Android
+elseif uri and uri == "/generate_204" or uri == "/gen_204" then -- Android
     print("Status: 204 No Content")
     print("")
-elseif uri == "/ncsi.txt" then -- Microsoft
+elseif uri and uri == "/ncsi.txt" then -- Microsoft
     print("Status: 200 OK")
     print("Content-Type: text/plain")
     print("Content-Length: 14")
     print("Cache-Control: max-age=30, must-revalidate")
     print("")
     io.write("Microsoft NCSI")
-elseif uri == "/connecttest.txt" then -- Microsoft
+elseif uri and uri == "/connecttest.txt" then -- Microsoft
     print("Status: 200 OK")
     print("Content-Type: text/plain")
     print("Content-Length: 22")
     print("Content-MD5: BMP8SohYjuR9M9BmkgrEEA==")
     print("")
     io.write("Microsoft Connect Test")
-elseif uri=="/success.txt" then --Mozilla
+elseif uri and uri == "/success.txt" then --Mozilla
     print("Status: 200 OK")
     print("Content-Type: text/plain")
     print("Content-Length: 8")

@@ -1,0 +1,36 @@
+#!/bin/ash
+
+# Copyright 2018 InvizBox Ltd
+#
+# Licensed under the InvizBox Shared License;
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#        https://www.invizbox.com/lic/license.txt
+#
+# This is here to set the urls and version correctly after a sysupgrade with kept settings
+
+function version { printf "%03d%03d%03d" $(echo "$1" | tr '.' ' '); }
+
+uci -c /rom/etc/config show update | grep "\.urls\." | xargs -n 1 uci set
+uci -c /rom/etc/config show update | grep "\.server\." | xargs -n 1 uci set
+uci set update.version.firmware=%V
+
+if [ -z $(uci get update.urls.nearest_cities) ]; then
+    local feature
+    config_get feature onboarding needed "true"
+    uci set admin-interface.features.onboarding_needed=$feature
+fi
+
+new_firmware_version=$(uci get update.version.new_firmware)
+if [ -n ${new_firmware_version}} ]; then
+    rom_version=$(uci -c /rom/etc/config get update.version.firmware)
+    if [ $(version ${new_firmware_version}) -le $(version ${rom_version}) ]; then
+        uci set update.version.new_firmware=
+        rm /etc/update/firmware/new_firmware*
+    fi
+fi
+uci commit update
+
+mkdir -p /etc/opkg_clear
+sed "s|http://invizboxinobxs4f.onion|https://update.invizbox.com|g" /etc/opkg/distfeeds.conf > /etc/opkg_clear/distfeeds.conf

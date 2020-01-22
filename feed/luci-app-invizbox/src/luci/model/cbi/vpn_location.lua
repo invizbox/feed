@@ -66,7 +66,7 @@ function map.parse(self)
         self.uci:set("vpn", "active", "vpn", utils.uci_characters(http.formvalue("vpncity")))
         self.uci:commit("vpn")
         self.apply_needed = true
-        if utils.apply_vpn_config(self.uci, "vpn", "tun0") then
+        if utils.apply_vpn_config(self.uci, "vpn", "tun0", false) then
             sys.call("/etc/init.d/openvpn restart")
         end
         return self:state_handler(1)

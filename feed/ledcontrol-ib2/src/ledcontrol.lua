@@ -18,7 +18,6 @@ end
 
 function led.set_off(led_name)
     uci:load(led.config)
-    uci:set(led.config, led_name, "default", "0")
     uci:set(led.config, led_name, "trigger", "none")
     uci:delete(led.config, led_name, "delayon")
     uci:delete(led.config, led_name, "delayoff")

@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-invizbox
 PKG_VERSION:=2.1
-PKG_RELEASE:=7
+PKG_RELEASE:=10
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 
@@ -39,9 +39,9 @@ endef
 
 define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci
-	$(CP) $(PKG_BUILD_DIR)/src/luci/*  $(1)/usr/lib/lua/luci/
+	$(CP) $(PKG_BUILD_DIR)/src/luci/* $(1)/usr/lib/lua/luci/
 	$(INSTALL_DIR) $(1)/www
-	$(CP) $(PKG_BUILD_DIR)/src/www/*  $(1)/www/
+	$(CP) $(PKG_BUILD_DIR)/src/www/* $(1)/www/
 	$(INSTALL_DIR) $(1)/
 	$(CP) $(PKG_BUILD_DIR)/root/* $(1)/
 	$(INSTALL_DIR) $(1)/www/luci-static/js
@@ -56,8 +56,8 @@ define Package/$(PKG_NAME)/preinst
 #!/bin/sh
 # check if we are on real system
 if [ -z "$${IPKG_INSTROOT}" ]; then
-    echo "Saving wizard state"
-    cp /etc/config/wizard /tmp/wizard
+	echo "Saving wizard state"
+	cp /etc/config/wizard /tmp/wizard
 fi
 exit 0
 endef
@@ -66,8 +66,8 @@ define Package/$(PKG_NAME)/postinst
 #!/bin/sh
 # check if we are on real system
 if [ -z "$${IPKG_INSTROOT}" ]; then
-    echo "Restoring wizard state and setting theme back to material"
-    cp /tmp/wizard /etc/config/wizard
+	echo "Restoring wizard state and setting theme back to material"
+	cp /tmp/wizard /etc/config/wizard
 	uci set luci.themes.Material=/luci-static/material
 	uci set luci.main.mediaurlbase=/luci-static/material
 	uci commit luci

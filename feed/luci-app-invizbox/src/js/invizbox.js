@@ -12,6 +12,13 @@
         var text = $('#vpncountry :selected').val();
         cityInput.html(options);
         $('#vpncity option[filtercountry!="' + text + '"]').remove();
+        selectRandomCity();
+        var chooseCityDiv = cityInput.parent().parent();
+        if (cityInput.children().length === 1) {
+          chooseCityDiv.css("display", "none");
+        } else {
+          chooseCityDiv.css("display", "block");
+        }
       });
       var selcity = $('#vpncity option:selected').attr('filtercountry');
       $('#vpncountry option[value*="' + selcity + '"]').prop('selected', 'selected').change();
@@ -39,6 +46,12 @@
   }
 
 })(jQuery);
+
+function selectRandomCity() {
+  var cityInput = $('#vpncity');
+  const randomIndex = Math.floor(Math.random() * (cityInput.children().length));
+  cityInput.prop('value', cityInput.children()[randomIndex].value);
+}
 
 function stopTor() {
   var endpoint = '/cgi-bin/luci/admin/system/flashops/stop_tor';

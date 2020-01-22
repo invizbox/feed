@@ -1,4 +1,4 @@
-config service ftux
+config service 'ftux'
 	option devices 'true'
 	option home 'true'
 	option networks 'true'
@@ -6,11 +6,15 @@ config service ftux
 	option support 'true'
 	option system 'true'
 
-config service onboarding
-	option needed 'true'
-
-config service features
+config service 'features'
+	option onboarding_needed 'true'
 	option vpn_status 'true'
+	option vpn_from_account 'false'
+	option separate_ipsec_credentials 'true'
+	option support_url 'http://help.test.com'
+	option support_email 'support@test.com'
+	option openvpn_credentials_url 'http://openvpn.creds'
+	option ipsec_credentials_url 'http://ipsec.creds'
 
 config network 'lan_vpn1'
 	option blacklist 'false'
@@ -18,6 +22,7 @@ config network 'lan_vpn1'
 	option name 'InvizBox 2 VPN'
 	option enabled_2_4ghz 'true'
 	option enabled_5ghz 'true'
+	option protocol_id 'openvpn_tcp_443'
 
 config network 'lan_vpn2'
 	option blacklist 'false'
@@ -25,6 +30,7 @@ config network 'lan_vpn2'
 	option name ''
 	option enabled_2_4ghz 'true'
 	option enabled_5ghz 'false'
+	option protocol_id 'openvpn_tcp_443'
 
 config network 'lan_vpn3'
 	option blacklist 'false'
@@ -32,6 +38,7 @@ config network 'lan_vpn3'
 	option name ''
 	option enabled_2_4ghz 'true'
 	option enabled_5ghz 'false'
+	option protocol_id 'openvpn_tcp_443'
 
 config network 'lan_vpn4'
 	option blacklist 'false'
@@ -39,6 +46,7 @@ config network 'lan_vpn4'
 	option name ''
 	option enabled_2_4ghz 'true'
 	option enabled_5ghz 'false'
+	option protocol_id 'openvpn_tcp_443'
 
 config network 'lan_tor'
 	option blacklist 'false'

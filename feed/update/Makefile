@@ -38,16 +38,6 @@ endef
 define Build/Compile
 endef
 
-define Package/$(PKG_NAME)/postinst
-#!/bin/sh
-# check if we are on real system
-if [ -z "$${IPKG_INSTROOT}" ]; then
-    uci set update.version.firmware=$(VERSION_NUMBER)
-    uci commit update
-fi
-exit 0
-endef
-
 define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/* $(1)/usr/lib/lua/
@@ -57,8 +47,8 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_CONF) $(PKG_BUILD_DIR)/root/etc/config/update $(1)/etc/config
 	$(SED) 's,%V,$(VERSION_NUMBER),g' $(1)/etc/config/update
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/root/etc/uci-defaults/99-update $(1)/etc/uci-defaults/99-update
-	$(SED) 's,%V,$(VERSION_NUMBER),g' $(1)/etc/uci-defaults/99-update
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/root/etc/uci-defaults/98_update $(1)/etc/uci-defaults/98_update
+	$(SED) 's,%V,$(VERSION_NUMBER),g' $(1)/etc/uci-defaults/98_update
 endef
 
 $(eval $(call BuildPackage,$(PKG_NAME)))

@@ -117,10 +117,16 @@ function update.change_locations_if_obsolete(pre_update_locations)
         os.execute("kill -USR1 $(ps | grep [r]est_api | awk '{print $1}') 2>/dev/null")
         uci:save(config_name)
         uci:commit(config_name)
+        local ipsec = uci:load("ipsec")
         for vpn_interface, tun_name in pairs(interfaces) do
-            utils.apply_vpn_config(uci, vpn_interface, tun_name)
+            utils.apply_vpn_config(uci, vpn_interface, tun_name, ipsec)
+        end
+        if ipsec then
+            uci:save("ipsec")
+            uci:commit("ipsec")
         end
         os.execute("/etc/init.d/openvpn restart")
+        os.execute("/etc/init.d/ipsec restart")
         utils.log("Updated locations which were missing after update to their closest match")
     end
 end
@@ -162,9 +168,10 @@ function update.update_vpn()
                     -- add new ones from CSV
                     local successful_replacement = false
                     for line in io.lines("/tmp/potential_configs/server_list.csv") do
-                        local matching_regex = "([^,]+),([^,]+),([^,]+),([^,]+),([^,]+)"
-                        local name, country, city, address, template = line:match(matching_regex)
-                        if name ~= "name" then
+                        local matching_regex = "([^,]+),([^,]+),([^,]+),([^,]+),([^,]+),([^,]+)"
+                        local name, country, city, address, template, protocols = line:match(matching_regex)
+                        local all_protocols = {}
+                        if name and name ~= "name" then
                             local uci_name = utils.uci_characters(name)
                             uci:set(config_name, uci_name, "server")
                             uci:set(config_name, uci_name, "country", country)
@@ -172,7 +179,27 @@ function update.update_vpn()
                             uci:set(config_name, uci_name, "name", name)
                             uci:set(config_name, uci_name, "address", address)
                             uci:set(config_name, uci_name, "template", ovpn_template_location..template)
+                            local protocol_list = {}
+                            for protocol in protocols:gmatch('([^-]+)') do
+                                table.insert(protocol_list, protocol)
+                                all_protocols[protocol] = ""
+                            end
+                            uci:set(config_name, uci_name, "protocol_id", protocol_list)
                             successful_replacement = true
+                        end
+                        for protocol,_ in pairs(all_protocols) do
+                            local uci_name = utils.uci_characters(protocol)
+                            local vpn_protocol = string.sub(protocol, 1, 7)
+                            uci:set(config_name, uci_name, "protocol")
+                            if vpn_protocol == "openvpn" then
+                                uci:set(config_name, uci_name, "vpn_protocol", "OpenVPN")
+                                uci:set(config_name, uci_name, "ip_protocol", string.sub(protocol, 9, 11):upper())
+                                uci:set(config_name, uci_name, "port", string.sub(protocol, 13))
+                            else
+                                uci:set(config_name, uci_name, "vpn_protocol", "IKEv2")
+                                uci:set(config_name, uci_name, "ip_protocol", "IPsec")
+                                uci:set(config_name, uci_name, "port", "50")
+                            end
                         end
                     end
                     if successful_replacement then
@@ -480,20 +507,19 @@ function update.update()
     local notify_rest_api = false
     local config_name = "update"
     uci:load(config_name)
+    if uci:get(config_name, "active", "opkg") == "true" then
+        utils.log("Updating opkg packages.")
+        update.update_opkg()
+    end
     if uci:get(config_name, "active", "vpn") == "true" then
         utils.log("Updating VPN status.")
         update.update_vpn_status()
         utils.log("Updating VPN locations.")
-
         notify_rest_api = (update.update_vpn() == true) or notify_rest_api
     end
     if uci:get(config_name, "active", "firmware") == "true" then
         utils.log("Updating firmware.")
         notify_rest_api = (update.update_firmware() == true) or notify_rest_api
-    end
-    if uci:get(config_name, "active", "opkg") == "true" then
-        utils.log("Updating opkg packages.")
-        update.update_opkg()
     end
     if uci:get(config_name, "active", "version_only") == "true" then
         utils.log("Updating version.")
@@ -503,7 +529,6 @@ function update.update()
         utils.log("Updating blacklists.")
         notify_rest_api = (update.update_blacklists() == true) or notify_rest_api
     end
-    -- notify rest-api if needed
     if notify_rest_api then
         os.execute("kill -USR1 $(ps | grep [r]est_api | awk '{print $1}') 2>/dev/null")
     end

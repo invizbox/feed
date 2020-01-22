@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=usb-automount-ib2
 PKG_VERSION:=0.0
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 
@@ -26,7 +26,7 @@ endef
 
 define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/block
-	$(CP) ./src/99-usb-automount.sh  $(1)/etc/hotplug.d/block/
+	$(CP) ./src/99-usb-automount.sh $(1)/etc/hotplug.d/block/
 endef
 
 $(eval $(call BuildPackage,$(PKG_NAME)))

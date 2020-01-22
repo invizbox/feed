@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=defaultpassword-mt7621
 PKG_VERSION:=1.0
-PKG_RELEASE:=6
+PKG_RELEASE:=8
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 
@@ -13,7 +13,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/$(PKG_NAME)
 	SECTION:=invizbox
 	CATEGORY:=InvizBox
-	DEPENDS:=+luasocket +invizboxutils
+	DEPENDS:=+invizboxutils
 	TITLE:=Default Password Setter for MT7621
 endef
 

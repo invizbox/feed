@@ -52,19 +52,21 @@ def get_alive_devices(ip_addresses):
         return []
 
 
-def get_devices(uci):
+def get_devices(uci, include_ips=False):
     """" helper function to get all information related to devices from UCI """
     uci.parse(DEVICE_PKG)
     devices_uci = uci.get_package(DEVICE_PKG)
-    ips = [device["ip_address"] for device in devices_uci
-           if device[".type"] == "device" and "ip_address" in device and device["ip_address"]]
-    alive_ips = get_alive_devices(ips)
+    if include_ips:
+        ips = [device["ip_address"] for device in devices_uci
+               if device[".type"] == "device" and "ip_address" in device and device["ip_address"]]
+        alive_ips = get_alive_devices(ips)
     devices = [
         {
             "id": device["id"],
             "name": device["name"] if "name" in device else "",
             "macAddress": device["mac_address"],
-            "ipAddress": device["ip_address"] if "ip_address" in device and device["ip_address"] in alive_ips else "",
+            "ipAddress": device["ip_address"] if include_ips and "ip_address" in device
+                         and device["ip_address"] in alive_ips else "",
             'type': device["type"] if "type" in device else ""
         }
         for device in devices_uci if device[".type"] == "device"
@@ -77,7 +79,7 @@ def get_devices(uci):
 def list_devices(uci):
     """ list known devices """
     try:
-        return {"devices": get_devices(uci)}
+        return {"devices": get_devices(uci, True)}
     except UciException:
         response.status = 400
         return "Error with devices"
@@ -89,7 +91,7 @@ def get_device(device_id, uci):
     """ list a specific device """
     LOGGER.debug("get_device() called")
     try:
-        devices = get_devices(uci)
+        devices = get_devices(uci, True)
         device = next(device for device in devices if device["id"] == device_id)
         return device
     except (UciException, StopIteration):
@@ -164,7 +166,7 @@ def update_device(device_id, uci):
     """ update a specific device """
     LOGGER.debug("update_device() called")
     try:
-        devices = get_devices(uci)
+        devices = get_devices(uci, True)
         device = next(device for device in devices if device["id"] == device_id)
     except (StopIteration, UciException):
         response.status = 404

@@ -22,7 +22,7 @@ define Package/$(PKG_NAME)
 endef
 
 define Package/$(PKG_NAME)/description
-  A pluggable API specification generator (OpenAPI)
+	A pluggable API specification generator (OpenAPI)
 endef
 
 define Build/Compile
@@ -32,8 +32,8 @@ endef
 define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)$(PYTHON3_PKG_DIR)
 	$(CP) \
-	    $(PKG_INSTALL_DIR)$(PYTHON3_PKG_DIR)/* \
-	    $(1)$(PYTHON3_PKG_DIR)
+		$(PKG_INSTALL_DIR)$(PYTHON3_PKG_DIR)/* \
+		$(1)$(PYTHON3_PKG_DIR)
 endef
 
 $(eval $(call BuildPackage,$(PKG_NAME)))
