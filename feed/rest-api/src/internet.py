@@ -106,7 +106,7 @@ def set_internet(uci):
                 "encryption": "psk-mixed" if updated_internet["encryption"] else "none",
                 "key": updated_internet["key"] if updated_internet["encryption"] else "none"})
         uci.persist(WIRELESS_PKG)
-        run(["/etc/init.d/network", "reload"])
+        run(["/etc/init.d/network", "reload"], check=False)
         return updated_internet
     except (JSONDecodeError, UciException, KeyError, TypeError):
         response.status = 400

@@ -11,6 +11,7 @@ uci_commit_reload() {
 }
 
 led_set_off() {
+    /sbin/uci set system.$1.default='0'
     /sbin/uci set system.$1.trigger='none'
     /sbin/uci set system.$1.delayon=
     /sbin/uci set system.$1.delayoff=
@@ -37,7 +38,10 @@ led_set_quick_flashing() {
 }
 
 led_set_solid() {
-    /sbin/uci set system.$1.trigger='default-on'
+    /sbin/uci set system.$1.default='1'
+    /sbin/uci set system.$1.trigger='none'
+    /sbin/uci set system.$1.delayon=
+    /sbin/uci set system.$1.delayoff=
     uci_commit_reload
 }
 

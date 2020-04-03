@@ -11,6 +11,10 @@
 . /lib/functions.sh
 function version { printf "%03d%03d%03d" $(echo "$1" | tr '.' ' '); }
 
+uci set rest-api.version=version
+uci set rest-api.version.api=%V
+uci commit rest-api
+
 openssl x509 -in /etc/lighttpd/inviz.box.pem -noout 2>/dev/null
 if [ $? -ne 0 ]; then
     openssl req \
@@ -51,13 +55,6 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
         port=1194
     fi
 
-    get_first_protocol_id()
-    {
-        if [ "$real_protocol_id" == "default" ]; then
-            real_protocol_id="$1"
-        fi
-    }
-
     set_protocol_id_if_missing()
     {
         local id
@@ -70,10 +67,8 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
         fi
     }
 
-    config_load vpn
-    real_protocol_id="default"
-    config_foreach get_first_protocol_id protocol
-    if [ "$real_protocol_id" == "default" ]; then
+    first_protocol_id=$(grep -m1 "config protocol" /etc/config/vpn | awk '{print $3}' | cut -d "'" -f 2)
+    if [ "$first_protocol_id" == "" ]; then
         uci set vpn.$protocol_id=protocol
         uci set vpn.$protocol_id.vpn_protocol=OpenVPN
         uci set vpn.$protocol_id.ip_protocol=$ip_protocol
@@ -81,10 +76,42 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
         if [ "${provider}" == "windscribe" ]; then
             uci set vpn.ikev2_ipsec=protocol
             uci set vpn.ikev2_ipsec.vpn_protocol=IKEv2
-            uci set vpn.ikev2_ipsec.ip_protocol=IPsec
+            uci set vpn.ikev2_ipsec.ip_protocol=IPSec
             uci set vpn.ikev2_ipsec.port=50
         fi
     fi
-    config_foreach set_protocol_id_if_missing server
+    servers=$(grep "config server" /etc/config/vpn | awk '{print $3}' | cut -d "'" -f 2)
+    for server in $servers
+    do
+        set_protocol_id_if_missing $server
+    done
+    uci commit vpn
+fi
+
+if [ $(version ${pre_update_version}) -lt $(version 0.1.0) ]; then
+    rewrite_protocol()
+    {
+        vpn_protocol=$(uci get vpn.$1.vpn_protocol)
+        ip_protocol=$(uci get vpn.$1.ip_protocol)
+        port=$(uci get vpn.$1.port)
+        uci set vpn.$1.name="$vpn_protocol over $ip_protocol port $port"
+        uci set vpn.$1.template="$first_template"
+        for server in $(uci get dhcp.vpn1.server)
+        do
+            case "$server" in
+                *@tun1) uci add_list vpn.$1.dns_server="${server::-5}" ;;
+            esac
+        done
+        uci del vpn.$1.ip_protocol
+        uci del vpn.$1.port
+    }
+
+    first_template=$(grep -m1 "option template" /etc/config/vpn | awk '{print $3}' | cut -d "'" -f 2)
+    sed -ie "/option template/d" /etc/config/vpn
+    protocols=$(grep "config protocol" /etc/config/vpn | awk '{print $3}' | cut -d "'" -f 2)
+    for protocol in $protocols
+    do
+        rewrite_protocol $protocol
+    done
     uci commit vpn
 fi

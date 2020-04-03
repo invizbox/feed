@@ -8,15 +8,15 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=python3-bottle2
-PKG_VERSION:=0.12.16
+PKG_VERSION:=0.12.18
 PKG_RELEASE:=1
 
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=Luka Perkov <luka@openwrt.org>
 
 PKG_SOURCE:=bottle-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://files.pythonhosted.org/packages/32/4e/ed046324d5ec980c252987c1dca191e001b9f06ceffaebf037eef469937c
-PKG_HASH:=9c310da61e7df2b6ac257d8a90811899ccb3a9743e77e947101072a2e3186726
+PKG_SOURCE_URL:=https://files.pythonhosted.org/packages/d9/4f/57887a07944140dae0d039d8bc270c249fc7fc4a00744effd73ae2cde0a9
+PKG_HASH:=0819b74b145a7def225c0e83b16a4d5711fde751cd92bae467a69efce720f69e
 PKG_BUILD_DIR:=$(BUILD_DIR)/bottle-$(PKG_VERSION)
 PKG_UNPACK=$(HOST_TAR) -C $(PKG_BUILD_DIR) --strip-components=1 -xzf $(DL_DIR)/$(PKG_SOURCE)
 

@@ -71,7 +71,7 @@ def set_wifi(uci):
                 uci.set_option(WIRELESS_PKG, "radio0", "channel", str(wifi["channels"]["2.4GHz"]))
                 uci.set_option(WIRELESS_PKG, "radio1", "channel", str(wifi["channels"]["5GHz"]))
                 uci.persist(WIRELESS_PKG)
-            run(["/etc/init.d/network", "reload"])
+            run(["/etc/init.d/network", "reload"], check=False)
         except UciException:
             response.status = 400
             return "Error writing wifi channels"

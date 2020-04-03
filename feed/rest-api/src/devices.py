@@ -2,7 +2,7 @@
     https://www.invizbox.com/lic/license.txt
 """
 import logging
-from subprocess import Popen, PIPE, CalledProcessError
+from subprocess import Popen, PIPE, CalledProcessError, run
 from json.decoder import JSONDecodeError
 from bottle_jwt import jwt_auth_required
 from bottle import Bottle, request, response
@@ -64,7 +64,8 @@ def get_devices(uci, include_ips=False):
         {
             "id": device["id"],
             "name": device["name"] if "name" in device else "",
-            "macAddress": device["mac_address"],
+            "hostname": device["hostname"] if "hostname" in device else "",
+            "macAddress": device["mac_address"].upper(),
             "ipAddress": device["ip_address"] if include_ips and "ip_address" in device
                          and device["ip_address"] in alive_ips else "",
             'type': device["type"] if "type" in device else ""
@@ -109,16 +110,16 @@ def create_device(uci):
             response.status = 400
             return "Empty or invalid content"
         try:
-            uci.get_config(DEVICE_PKG, uci_characters(device["macAddress"]))
+            uci.get_config(DEVICE_PKG, uci_characters(device["macAddress"].lower()))
             response.status = 400
             return "Duplicate device (MAC Address)"
         except UciException:
             pass
         new_device = {
             ".type": "device",
-            "id": uci_characters(device["macAddress"]),
+            "id": uci_characters(device["macAddress"].lower()),
             "name": device["name"],
-            "mac_address": device["macAddress"],
+            "mac_address": device["macAddress"].lower(),
             'type': device["type"]
         }
         uci.add_config(DEVICE_PKG, new_device)
@@ -127,7 +128,7 @@ def create_device(uci):
         return {
             "id": new_device["id"],
             "name": new_device["name"],
-            "macAddress": new_device["mac_address"],
+            "macAddress": new_device["mac_address"].upper(),
             "ipAddress": "",
             'type': new_device["type"]
         }
@@ -143,16 +144,20 @@ def delete_device(device_id, uci):
     LOGGER.debug("delete_device() called")
     try:
         devices = get_devices(uci)
-        mac_address = next(device["macAddress"] for device in devices if device["id"] == device_id)
+        mac_address = next(device["macAddress"].lower() for device in devices if device["id"] == device_id)
         uci.get_config(DEVICE_PKG, device_id)
         uci.delete_config(DEVICE_PKG, device_id)
         uci.persist(DEVICE_PKG)
         profiles.delete_device_from_profiles(device_id)
+        firewall_changed = False
         for rule in uci.get_package(FIREWALL_PKG):
             if ".type" in rule and rule[".type"] == "rule" and "id" in rule and rule["id"]:
-                if "src_mac" in rule and rule["src_mac"] == mac_address:
+                if "src_mac" in rule and rule["src_mac"].lower() == mac_address:
                     uci.delete_config(FIREWALL_PKG, rule["id"])
-        uci.persist(FIREWALL_PKG)
+                    firewall_changed = True
+        if firewall_changed:
+            uci.persist(FIREWALL_PKG)
+            run(["/etc/init.d/firewall", "reload"], check=False)
         response.status = 204
         return ""
     except (StopIteration, UciException):

@@ -3,13 +3,14 @@
 -- https://www.invizbox.com/lic/license.txt
 -- Monitors the network to identify changes in available networks/interfaces and modifies routing tables accordingly
 
-local os = require("os")
-local string = require("string")
-local utils = require "invizboxutils"
 local led = require "ledcontrol"
+local os = require("os")
+local signal = require("posix.signal")
+local string = require("string")
 local uci_mod = require("uci")
 local uci = uci_mod.cursor()
-local signal = require("posix.signal")
+local update = require("update")
+local utils = require "invizboxutils"
 
 local netwatch2 = {}
 netwatch2.running = true
@@ -51,7 +52,7 @@ function netwatch2.set_dnsmasq_uci_captive(captive)
 end
 
 function netwatch2.deal_with_connectivity()
-    if os.execute("ip -f inet -o addr show "..netwatch2.wan_interface.." | grep [i]net > /dev/null") == 0 then
+    if os.execute("ip route | grep '^default' > /dev/null") == 0 then
         if netwatch2.wan_up == nil or not netwatch2.wan_up then
             utils.log(netwatch2.wan_interface.." interface is connected.")
             -- Get Initial VPN server if needed
@@ -65,6 +66,13 @@ function netwatch2.deal_with_connectivity()
             -- DNS
             netwatch2.set_dnsmasq_uci_captive(false)
             netwatch2.wan_up = true
+        end
+        uci:load("vpn")
+        uci:load("update")
+        if uci:get("vpn", "active", "username") ~= nil and uci:get("update", "active", "current_vpn_sha") == "123456"
+                and utils.tor_is_up() then
+            utils.log("Running update to get the initial set of VPN configurations")
+            update.update() -- initial update
         end
     else
         if netwatch2.wan_up == nil or netwatch2.wan_up then
@@ -92,9 +100,10 @@ function netwatch2.save_credentials()
             local net_up = utils.get_first_line("/tmp/openvpn/"..network_id.."/status") == "up"
             if openvpn_net and net_up and not save_openvpn then
                 save_openvpn = true
-                os.execute("sed 'N;s/\\n/ /' /etc/openvpn/login.auth > /tmp/vpn_credentials.txt")
-                os.execute("! diff -q /tmp/vpn_credentials.txt /private/vpn_credentials.txt"..
-                        "&& cp /tmp/vpn_credentials.txt /private/vpn_credentials.txt")
+                if os.execute("sed 'N;s/\\n/ /' /etc/openvpn/login.auth > /tmp/vpn_credentials.txt") == 0 then
+                    os.execute("! diff -q /tmp/vpn_credentials.txt /private/vpn_credentials.txt"..
+                            "&& cp /tmp/vpn_credentials.txt /private/vpn_credentials.txt")
+                end
             elseif separate_ipsec_credentials and ikev2_net and net_up and not save_ipsec then
                 save_ipsec = true
                 uci:load("ipsec")
@@ -111,7 +120,7 @@ function netwatch2.save_credentials()
 end
 
 function netwatch2.deal_with_vpn()
-    if os.execute("grep -r up /tmp/openvpn/ >/dev/null 2>&1") == 0 then
+    if netwatch2.wan_up and os.execute("grep -r up /tmp/openvpn/ >/dev/null 2>&1") == 0 then
         netwatch2.save_credentials()
         if netwatch2.vpn_connected == nil or not netwatch2.vpn_connected then
             led._lock_on()
@@ -136,9 +145,8 @@ function netwatch2.deal_with_swconfig(interface, port)
 end
 
 function netwatch2.deal_with_update()
-    local config_name = "update"
-    uci:load(config_name)
-    if uci:get(config_name, "version", "new_firmware") ~= nil then
+    uci:load("update")
+    if uci:get("update", "version", "new_firmware") ~= nil then
         led._info_slow_flashing()
     end
 end

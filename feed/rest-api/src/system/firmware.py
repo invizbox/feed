@@ -2,7 +2,7 @@
     https://www.invizbox.com/lic/license.txt
 """
 import logging
-from os import system
+from os import system, path
 from os.path import splitext
 from json.decoder import JSONDecodeError
 from hashlib import sha256
@@ -31,15 +31,16 @@ def upload_firmware():
         return 'File extension must be ".bin"'
     upload.filename = "firmware.img.gz"
     upload.save("/tmp", overwrite=True, chunk_size=CHUNK_SIZE)
-    if system("gunzip -c /tmp/firmware.img.gz > /tmp/firmware.img") != 0 \
-       or system("/sbin/sysupgrade --test /tmp/firmware.img > /tmp/sysupgrade_test.txt") != 0 \
-            or system("grep -q 'Invalid partition table on ' /tmp/sysupgrade_test.txt") == 0:
-        response.status = 422
-        return 'Uploaded file is not a valid InvizBox 2 firmware.'
     sha256_handler_ = sha256()
     with open("/tmp/firmware.img.gz", 'rb') as firmware_file:
         for block in iter(lambda: firmware_file.read(CHUNK_SIZE), b''):
             sha256_handler_.update(block)
+    system("rm /tmp/*.img")
+    if system(f"gunzip -c /tmp/firmware.img.gz > /tmp/{sha256_handler_.hexdigest()}.img") != 0 \
+       or system(f"/sbin/sysupgrade --test /tmp/{sha256_handler_.hexdigest()}.img > /tmp/sysupgrade_test.txt") != 0 \
+            or system("grep -q 'Invalid partition table on ' /tmp/sysupgrade_test.txt") == 0:
+        response.status = 422
+        return 'Uploaded file is not a valid InvizBox 2 firmware.'
     return {"SHA256": sha256_handler_.hexdigest()}
 
 
@@ -58,28 +59,19 @@ def flash_firmware():
         except KeyError:
             response.status = 400
             return "Missing element"
-        sha256_handler = sha256()
-        try:
-            with open("/tmp/firmware.img.gz", 'rb') as firmware_file:
-                for block in iter(lambda: firmware_file.read(CHUNK_SIZE), b''):
-                    sha256_handler.update(block)
-            if received_sha256_sum == sha256_handler.hexdigest():
-                system("gunzip /tmp/firmware.img.gz")
-                ADMIN_INTERFACE_APP.ping_ready = False
-                UCI_PLUGIN.uci.persist = lambda *_: None
-                system(". /bin/ledcontrol.ash; led_info_quick_flashing")
-                if isinstance(drop_config, bool) and drop_config:
-                    system("/sbin/sysupgrade -n /tmp/firmware.img &")
-                    LOGGER.error("calling sysupgrade with -n")
-                else:
-                    system("/sbin/sysupgrade /tmp/firmware.img &")
-                    LOGGER.error("calling sysupgrade without -n")
+        if path.isfile(f"/tmp/{received_sha256_sum}.img"):
+            ADMIN_INTERFACE_APP.ping_ready = False
+            UCI_PLUGIN.uci.persist = lambda *_: None
+            system(". /bin/ledcontrol.ash; led_info_quick_flashing")
+            if isinstance(drop_config, bool) and drop_config:
+                LOGGER.error("calling sysupgrade with -n")
+                system(f"/sbin/sysupgrade -n /tmp/{received_sha256_sum}.img &")
             else:
-                response.status = 400
-                return "SHA256 hash doesn't match the previously uploaded file"
-        except FileNotFoundError:
+                LOGGER.error("calling sysupgrade without -n")
+                system(f"/sbin/sysupgrade /tmp/{received_sha256_sum}.img &")
+        else:
             response.status = 400
-            return "Missing firmware file"
+            return "SHA256 hash doesn't match the previously uploaded file"
         return "OK"
     except JSONDecodeError:
         response.status = 400
@@ -102,16 +94,16 @@ def flash_new_firmware():
             response.status = 400
             return "Missing element"
         if system(f"mv /etc/update/firmware/new_firmware-{version}-sysupgrade.bin /tmp/firmware.img.gz") == 0 \
-                and system(f"gunzip /tmp/firmware.img.gz") == 0:
+                and system(f"gunzip -f /tmp/firmware.img.gz > /tmp/firmware.img") == 0:
             ADMIN_INTERFACE_APP.ping_ready = False
             UCI_PLUGIN.uci.persist = lambda *_: None
             system(". /bin/ledcontrol.ash; led_info_quick_flashing")
             if isinstance(drop_config, bool) and drop_config:
-                system(f"/sbin/sysupgrade -n /tmp/firmware.img &")
                 LOGGER.error("calling sysupgrade with -n")
+                system(f"/sbin/sysupgrade -n /tmp/firmware.img &")
             else:
-                system(f"/sbin/sysupgrade /tmp/firmware.img &")
                 LOGGER.error("calling sysupgrade without -n")
+                system(f"/sbin/sysupgrade /tmp/firmware.img &")
         else:
             response.status = 400
             return "Missing firmware file"

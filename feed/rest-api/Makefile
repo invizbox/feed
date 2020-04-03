@@ -5,10 +5,11 @@ include $(INCLUDE_DIR)/version.mk
 
 PKG_NAME:=rest-api
 PKG_VERSION:=0.4
-PKG_RELEASE:=4
+PKG_RELEASE:=11
 
 include $(INCLUDE_DIR)/package.mk
 include ../../../packages/lang/python/python3-package.mk
+include ../api-version.mk
 
 define Package/$(PKG_NAME)
 	SECTION:=invizbox
@@ -18,16 +19,23 @@ define Package/$(PKG_NAME)
 	+ca-certificates +libustream-openssl +python3-logging +python3-codecs +python3-email +openssl-util \
 	+python3-apispec +python3-ua-parser +fping +openvpn-openssl +logrotate +iptables +iptables-mod-conntrack-extra \
 	+strongswan-eap-mschapv2 +iputils-ping
-	TITLE:=REST API for Invizbox 2 management
+	TITLE:=REST API for InvizBox 2 management
 endef
 
 define Package/$(PKG_NAME)/description
-	Provides a RESTful API to interact with an Invizbox 2
+	Provides a RESTful API to interact with an InvizBox 2
 endef
 
 define Package/$(PKG_NAME)/conffiles
 	/etc/config/devices
 	/etc/config/rest-api
+endef
+
+define Build/Configure
+	if [ "$(PKG_VERSION).$(PKG_RELEASE)" != "$(REST_API_EXPECTED_VERSION)" ]; then \
+		echo "Build error: Make sure you update the REST_API_EXPECTED_VERSION in api-version.mk and consider if your REST API has changed or not."; \
+		exit 1; \
+	fi
 endef
 
 define Build/Compile
@@ -43,6 +51,8 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/etc/dns_blacklist
 	$(INSTALL_DIR) $(1)/lib/upgrade/keep.d
 	$(INSTALL_DATA) files/rest-api.upgrade $(1)/lib/upgrade/keep.d/rest-api
+	$(SED) 's,%V,$(API_VERSION),g' $(1)/etc/config/rest-api
+	$(SED) 's,%V,$(API_VERSION),g' $(1)/etc/uci-defaults/20-rest-api
 endef
 
 define Package/$(PKG_NAME)/preinst

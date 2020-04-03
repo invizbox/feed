@@ -27,8 +27,15 @@ HEADERS = {
 
 def anonymise():
     """ helper function to anonymise the snapshot content """
-    run(["sed", "-i", "-E", "s/option password .+/option password 'anonymised'/", "/tmp/snapshot/config/rest-api"])
-    run(["sed", "-i", "-E", "s/option key .+/option key 'anonymised'/", "/tmp/snapshot/config/wireless"])
+    run(["sed", "-i", "-E", "s/option password .+/option password 'anonymised'/", "/tmp/snapshot/config/rest-api"],
+        check=False)
+    run(["sed", "-i", "-E", "s/option key .+/option key 'anonymised'/", "/tmp/snapshot/config/wireless"], check=False)
+    run(["sed", "-i", "-E", "s/option username .+/option username 'anonymised'/", "/tmp/snapshot/config/vpn"],
+        check=False)
+    run(["sed", "-i", "-E", "s/option eap_identity .+/option eap_identity 'anonymised'/", "/tmp/snapshot/config/ipsec"],
+        check=False)
+    run(["sed", "-i", "-E", "s/option eap_password .+/option eap_password 'anonymised'/", "/tmp/snapshot/config/ipsec"],
+        check=False)
 
 
 @SNAPSHOT_APP.get('/system/snapshot')
@@ -37,29 +44,30 @@ def get_snapshot():
     """
     gets a snapshot of the router's configuration useful for troubleshooting a support issue
     """
-    run(["rm", "-rf", "/tmp/snapshot"])
-    run(["mkdir", "-p", "/tmp/snapshot"])
-    run(["cp", "-r", "/etc/config", "/tmp/snapshot"])
-    run(["cp", "-r", "/etc/profiles.json", "/tmp/snapshot"])
-    run(["cp", "-r", "/var/log", "/tmp/snapshot"])
+    run(["rm", "-rf", "/tmp/snapshot"], check=False)
+    run(["mkdir", "-p", "/tmp/snapshot"], check=False)
+    run(["cp", "-r", "/etc/config", "/tmp/snapshot"], check=False)
+    run(["cp", "-r", "/etc/profiles.json", "/tmp/snapshot"], check=False)
+    run(["cp", "-r", "/var/log", "/tmp/snapshot"], check=False)
     with open("/tmp/snapshot/top.txt", "w") as out_file:
-        run(["top", "-n", "1"], stdout=out_file, stderr=STDOUT)
+        run(["top", "-n", "1"], stdout=out_file, stderr=STDOUT, check=False)
     with open("/tmp/snapshot/ps.txt", "w") as out_file:
-        run(["ps"], stdout=out_file, stderr=STDOUT)
+        run(["ps"], stdout=out_file, stderr=STDOUT, check=False)
     with open("/tmp/snapshot/logread.txt", "w") as out_file:
-        run(["logread"], stdout=out_file, stderr=STDOUT)
+        run(["logread"], stdout=out_file, stderr=STDOUT, check=False)
     with open("/tmp/snapshot/ifconfig.txt", "w") as out_file:
-        run(["ifconfig"], stdout=out_file, stderr=STDOUT)
+        run(["ifconfig"], stdout=out_file, stderr=STDOUT, check=False)
     with open("/tmp/snapshot/iptables-save.txt", "w") as out_file:
-        run(["iptables-save"], stdout=out_file, stderr=STDOUT)
+        run(["iptables-save"], stdout=out_file, stderr=STDOUT, check=False)
     with open("/tmp/snapshot/nslookup.txt", "w") as out_file:
-        run(["nslookup", "invizbox.com"], stdout=out_file, stderr=STDOUT)
+        run(["nslookup", "invizbox.com"], stdout=out_file, stderr=STDOUT, check=False)
     with open("/tmp/snapshot/route.txt", "w") as out_file:
-        run(["route"], stdout=out_file, stderr=STDOUT)
+        run(["route"], stdout=out_file, stderr=STDOUT, check=False)
     with open("/tmp/snapshot/traceroute.txt", "w") as out_file:
-        run(["traceroute", "-w", "1", "-q", "1", "-m", "60", "invizbox.com"], stdout=out_file, stderr=STDOUT)
+        run(["traceroute", "-w", "1", "-q", "1", "-m", "60", "invizbox.com"], stdout=out_file, stderr=STDOUT,
+            check=False)
     anonymise()
-    run(["tar", "-zcf", "snapshot.tar.gz", "./snapshot"], cwd="/tmp")
+    run(["tar", "-zcf", "snapshot.tar.gz", "./snapshot"], cwd="/tmp", check=False)
     root = os.path.abspath('./') + os.sep
     filename = os.path.abspath(os.path.join(root, '/tmp/snapshot.tar.gz'))
     body = open(filename, 'rb')

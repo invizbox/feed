@@ -43,6 +43,24 @@ def reset():
     system("/sbin/reboot &")
 
 
+@SYSTEM_APP.post('/system/check_for_updates')
+@jwt_auth_required
+def check_for_updates():
+    """runs a check for updates"""
+    system("/usr/lib/lua/update.lua &")
+
+
+@SYSTEM_APP.get('/system/check_for_updates')
+@jwt_auth_required
+def checking_for_updates():
+    """returns whether the InvizBox 2 is checking for updates"""
+    checking = True
+    if system("lock -n /var/lock/update.lock") == 0:
+        checking = False
+        system("lock -u /var/lock/update.lock")
+    return {"checkingForUpdates": checking}
+
+
 @SYSTEM_APP.get('/system/timezone')
 @jwt_auth_required
 def get_timezone(uci):
@@ -79,7 +97,7 @@ def set_timezone(uci):
             uci.set_option(SYSTEM_PKG, "system", "zonename", updated_timezone["current"].replace('_', ' '))
             uci.set_option(SYSTEM_PKG, "system", "timezone", TZ_DATA[updated_timezone["current"]])
             uci.persist(SYSTEM_PKG)
-            run(["/etc/init.d/system", "reload"])
+            run(["/etc/init.d/system", "reload"], check=False)
             return updated_timezone
         response.status = 400
         return "Invalid timezone"

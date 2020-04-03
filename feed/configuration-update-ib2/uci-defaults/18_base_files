@@ -679,3 +679,70 @@ EOT
         uci add_list dhcp.lan_local.dhcp_option="option:domain-search,vpn1,vpn2,clear1,tor,clear2,vpn3,vpn4"
     fi
 fi
+
+if [ $(version ${pre_update_version}) -lt $(version 0.1.0) ]; then
+    # firewall - where order matters
+    uci set firewall.vpn1_to_all=rule
+    uci set firewall.vpn1_to_all.src=lan_vpn1
+    uci set firewall.vpn1_to_all.dest=lan_all
+    uci set firewall.vpn1_to_all.mark=1
+    uci set firewall.vpn1_to_all.proto=all
+    uci set firewall.vpn1_to_all.target=ACCEPT
+    uci reorder firewall.vpn1_to_all=4
+
+    uci set firewall.vpn2_to_all=rule
+    uci set firewall.vpn2_to_all.src=lan_vpn2
+    uci set firewall.vpn2_to_all.dest=lan_all
+    uci set firewall.vpn2_to_all.mark=2
+    uci set firewall.vpn2_to_all.proto=all
+    uci set firewall.vpn2_to_all.target=ACCEPT
+    uci reorder firewall.vpn2_to_all=6
+
+    uci set firewall.vpn3_to_all=rule
+    uci set firewall.vpn3_to_all.src=lan_vpn3
+    uci set firewall.vpn3_to_all.dest=lan_all
+    uci set firewall.vpn3_to_all.mark=4
+    uci set firewall.vpn3_to_all.proto=all
+    uci set firewall.vpn3_to_all.target=ACCEPT
+    uci reorder firewall.vpn3_to_all=8
+
+    uci set firewall.vpn4_to_all=rule
+    uci set firewall.vpn4_to_all.src=lan_vpn4
+    uci set firewall.vpn4_to_all.dest=lan_all
+    uci set firewall.vpn4_to_all.mark=8
+    uci set firewall.vpn4_to_all.proto=all
+    uci set firewall.vpn4_to_all.target=ACCEPT
+    uci reorder firewall.vpn4_to_all=10
+
+    uci set firewall.tor_to_all=rule
+    uci set firewall.tor_to_all.src=lan_tor
+    uci set firewall.tor_to_all.dest=lan_all
+    uci set firewall.tor_to_all.mark=16
+    uci set firewall.tor_to_all.proto=all
+    uci set firewall.tor_to_all.target=ACCEPT
+    uci reorder firewall.tor_to_all=12
+
+    uci set firewall.clear1_to_all=rule
+    uci set firewall.clear1_to_all.src=lan_clear1
+    uci set firewall.clear1_to_all.dest=lan_all
+    uci set firewall.clear1_to_all.mark=32
+    uci set firewall.clear1_to_all.proto=all
+    uci set firewall.clear1_to_all.target=ACCEPT
+    uci reorder firewall.clear1_to_all=14
+
+    uci set firewall.clear2_to_all=rule
+    uci set firewall.clear2_to_all.src=lan_clear2
+    uci set firewall.clear2_to_all.dest=lan_all
+    uci set firewall.clear2_to_all.mark=64
+    uci set firewall.clear2_to_all.proto=all
+    uci set firewall.clear2_to_all.target=ACCEPT
+    uci reorder firewall.clear2_to_all=16
+
+    uci set firewall.local_to_all=rule
+    uci set firewall.local_to_all.src=lan_local
+    uci set firewall.local_to_all.dest=lan_all
+    uci set firewall.local_to_all.mark=128
+    uci set firewall.local_to_all.proto=all
+    uci set firewall.local_to_all.target=ACCEPT
+    uci reorder firewall.local_to_all=18
+fi

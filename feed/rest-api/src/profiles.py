@@ -186,9 +186,9 @@ def delete_profile(profile_id, uci):
             reload_dropbear, reload_firewall = update_profile_network(uci, network_id, profile, ALL_OFF_PROFILE)
             uci.set_option(ADMIN_PKG, network_id, "profile_id", "")
         if reload_dropbear:
-            run(["/etc/init.d/dropbear", "reload"])
+            run(["/etc/init.d/dropbear", "reload"], check=False)
         if reload_firewall:
-            run(["/etc/init.d/firewall", "reload"])
+            run(["/etc/init.d/firewall", "reload"], check=False)
         uci.persist(ADMIN_PKG)
         PROFILES_APP.profiles["profiles"].remove(profile)
         persist_profiles()
@@ -255,7 +255,7 @@ def rebuild_site_blocking(uci, network_id, profile):
             system(f"cat {' '.join(file_list)} > /etc/dns_blacklist/{network_id}.overall")
         else:
             system(f"echo > /etc/dns_blacklist/{network_id}.overall")
-        run(["killall", "-HUP", "dnsmasq"])
+        run(["killall", "-HUP", "dnsmasq"], check=False)
 
 
 def update_profile_network(uci, network_id, current_profile, new_profile):
@@ -270,7 +270,7 @@ def update_profile_network(uci, network_id, current_profile, new_profile):
     if update_blocking or update_access:
         for rule in uci.get_package(FIREWALL_PKG):
             if ".type" in rule and rule[".type"] == "rule" and "id" in rule and rule["id"]:
-                is_blocking_rule = update_blocking and "src" in rule and rule["src"] == network_id
+                is_blocking_rule = update_blocking and "src_mac" in rule and "src" in rule and rule["src"] == network_id
                 is_access_rule = update_access and "set_mark" in rule and rule["set_mark"] == NETWORK_MARKS[network_id]
                 if is_blocking_rule or is_access_rule:
                     uci.delete_config(FIREWALL_PKG, rule["id"])
@@ -309,9 +309,9 @@ def update_profile(profile_id, uci):
         for network_id in associated_networks:
             reload_dropbear, reload_firewall = update_profile_network(uci, network_id, profile, updated_profile)
         if reload_dropbear:
-            run(["/etc/init.d/dropbear", "reload"])
+            run(["/etc/init.d/dropbear", "reload"], check=False)
         if reload_firewall:
-            run(["/etc/init.d/firewall", "reload"])
+            run(["/etc/init.d/firewall", "reload"], check=False)
         profile["name"] = updated_profile["name"]
         profile["type"] = updated_profile["type"]
         profile["ssh"] = updated_profile["ssh"]

@@ -1,4 +1,4 @@
-# Copyright (C) 2016 Invizbox Ltd.
+# Copyright (C) 2016 InvizBox Ltd.
 
 include $(TOPDIR)/rules.mk
 

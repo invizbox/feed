@@ -3,7 +3,6 @@
 """
 import logging
 from subprocess import run, PIPE
-from os import system
 from socket import error, socket, timeout, AF_INET, SOCK_STREAM
 from json.decoder import JSONDecodeError
 from bottle_jwt import jwt_auth_required
@@ -14,6 +13,7 @@ from plugins.plugin_jwt import JWT_PLUGIN
 
 
 NETWORK_PKG = "network"
+REST_API_PKG = "rest-api"
 UPDATE_PKG = "update"
 WIRELESS_PKG = "wireless"
 LOGGER = logging.getLogger(__name__)
@@ -29,12 +29,29 @@ INFO_APP.install(UCI_ROM_PLUGIN)
 def get_generic_info(uci, uci_rom):
     """Endpoint to get access the fixed properties of the device
     Model
+    Kernel
     Hostname
-    Firmware Version: current and reset
+    Mac Addresses
+    Firmware Version: current, reset and new
+    API Version
+    admin-interface Version
+    Ports
     """
     try:
-        ubus_process = run(["ubus", "call", "system", "board"], stdout=PIPE, stderr=PIPE, timeout=5)
+        ubus_process = run(["ubus", "call", "system", "board"], stdout=PIPE, stderr=PIPE, timeout=5, check=False)
         system_json = json_loads(ubus_process.stdout)
+        with open("/sys/devices/platform/soc/1c30000.ethernet/net/eth0/address") as addresses_file:
+            mac_address_ethernet = addresses_file.readline().rstrip()
+        with open("/sys/devices/platform/soc/1c1b000.usb/usb2/2-1/2-1:1.0/ieee80211/phy1/addresses") as addresses_file:
+            mac_address_24ghz = addresses_file.readline().rstrip()
+        with open("/sys/devices/platform/soc/1c10000.mmc/mmc_host/mmc1/mmc1:0001/mmc1:0001:1/ieee80211/phy0/addresses")\
+                as addresses_file:
+            mac_address_5ghz = addresses_file.readline().rstrip()
+        with open("/usr/lib/opkg/info/admin-interface.control") as admin_interface_file:
+            for line in admin_interface_file.readlines():
+                if line.startswith("Version:"):
+                    admin_interface_version = line.strip().split()[1].replace('-', '.')
+                    break
         try:
             firmware_version = uci.get_option(UPDATE_PKG, "version", "firmware") or "unknown"
         except UciException:
@@ -47,11 +64,22 @@ def get_generic_info(uci, uci_rom):
             new_firmware_version = uci.get_option(UPDATE_PKG, "version", "new_firmware") or "unknown"
         except UciException:
             new_firmware_version = "unknown"
+        try:
+            api_version = uci.get_option(REST_API_PKG, "version", "api") or "unknown"
+        except UciException:
+            api_version = "unknown"
         return {"info": {"currentFirmware": firmware_version,
                          "resetFirmware": rom_firmware_version,
                          "newFirmware": new_firmware_version,
+                         "api": api_version,
+                         "adminInterface": admin_interface_version,
                          "kernel": system_json["kernel"],
                          "hostName": system_json["hostname"],
+                         "macAddresses": {
+                             "ethernet": mac_address_ethernet,
+                             "wifi24GHz": mac_address_24ghz,
+                             "wifi5GHz": mac_address_5ghz,
+                         },
                          "model": system_json["model"],
                          "ports": ["1", "2", "3", "4"] if "Pro" in system_json["model"] else ["LAN"]}}
     except JSONDecodeError:
@@ -68,7 +96,7 @@ def get_stateful_info():
     memory
     """
     try:
-        ubus_process = run(["ubus", "call", "system", "info"], stdout=PIPE, stderr=PIPE, timeout=5)
+        ubus_process = run(["ubus", "call", "system", "info"], stdout=PIPE, stderr=PIPE, timeout=5, check=False)
         system_json = json_loads(ubus_process.stdout)
         return {"info": system_json}
     except JSONDecodeError:
@@ -117,33 +145,19 @@ def check_file_content(filename, expected_content):
 
 @INFO_APP.get('/system/info/connectivity')
 @jwt_auth_required
-def get_connectivity_info(uci):
+def get_connectivity_info():
     """Endpoint to get access the connectivity properties of the device"""
     try:
-        network_uci = uci.get_package(NETWORK_PKG)
-        sta_iface = ""
-        internet_connected = False
-        try:
-            sta_iface = next(network["ifname"] if "ifname" in network else ""
-                             for network in network_uci if network[".type"] == "interface" and network["id"] == "wan")
-        except StopIteration:
-            pass
-        if sta_iface == "":
-            wireless_uci = uci.get_package(WIRELESS_PKG)
-            try:
-                sta_iface = next(network["ifname"] if "ifname" in network else "" for network in wireless_uci
-                                 if network[".type"] == "wifi-iface" and network["id"] == "wan")
-            except StopIteration:
-                pass
-        if sta_iface != "":
-            internet_connected = system(f"ip -f inet -o addr show {sta_iface} | grep [i]net > /dev/null") == 0
-        return {"connectivity": {"device_ip": request.environ.get('REMOTE_ADDR'),
-                                 "internet": internet_connected,
-                                 "lan_tor": tor_up(),
-                                 "lan_vpn1": check_file_content("/tmp/openvpn/1/status", "up"),
-                                 "lan_vpn2": check_file_content("/tmp/openvpn/2/status", "up"),
-                                 "lan_vpn3": check_file_content("/tmp/openvpn/3/status", "up"),
-                                 "lan_vpn4": check_file_content("/tmp/openvpn/4/status", "up")}}
+        ip_route = run(["ip", "route"], stdout=PIPE, stderr=PIPE, timeout=5, check=False)
+        invizbox_ip = next((line.strip().split(' ')[-1] for line in ip_route.stdout.decode('ascii').splitlines()
+                            if line.startswith("default")), "")
+        return {"connectivity": {"deviceIp": request.environ.get('REMOTE_ADDR'),
+                                 "invizboxIp": invizbox_ip,
+                                 "lan_tor": invizbox_ip != "" and tor_up(),
+                                 "lan_vpn1": invizbox_ip != "" and check_file_content("/tmp/openvpn/1/status", "up"),
+                                 "lan_vpn2": invizbox_ip != "" and check_file_content("/tmp/openvpn/2/status", "up"),
+                                 "lan_vpn3": invizbox_ip != "" and check_file_content("/tmp/openvpn/3/status", "up"),
+                                 "lan_vpn4": invizbox_ip != "" and check_file_content("/tmp/openvpn/4/status", "up")}}
     except (FileNotFoundError, IOError):
         response.status = 400
         return "Error getting connectivity information"

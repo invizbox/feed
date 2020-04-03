@@ -57,7 +57,7 @@ def put_user(user_id, uci):
             users_uci = uci.get_package(REST_API_PKG)
             user_name = next(user["name"] for user in users_uci if user[".type"] == "user" and user["id"] == user_id)
             password_input = updated_user["password"] + "\n" + updated_user["password"]
-            run(['passwd', user_name], stdout=PIPE, stderr=PIPE, input=password_input, encoding='utf-8')
+            run(['passwd', user_name], stdout=PIPE, stderr=PIPE, input=password_input, encoding='utf-8', check=False)
             uci.set_option(REST_API_PKG, str(user_id), "password", updated_user["password"])
             uci.persist(REST_API_PKG)
         except (UciException, SubprocessError):

@@ -7,7 +7,7 @@ PKG_LICENSE:=BSD-3-Clause
 
 PKG_SOURCE:=flup-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://pypi.python.org/packages/source/f/flup/
-PKG_MD5SUM:=a64e7a6374e043480ee92534c735964e
+PKG_HASH:=5eb09f26eb0751f8380d8ac43d1dfb20e1d42eca0fa45ea9289fa532a79cd159
 PKG_BUILD_DIR:=$(BUILD_DIR)/flup-$(PKG_VERSION)
 
 include $(INCLUDE_DIR)/package.mk

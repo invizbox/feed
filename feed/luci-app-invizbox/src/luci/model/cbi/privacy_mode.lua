@@ -30,30 +30,27 @@ mode:value("extend", "Wifi Extender")
 
 function map.on_after_commit(self)
     local selected_mode = self:formvalue("cbid.vpn.active.mode")
-    local config_name = "wizard"
-    uci:load(config_name)
-    local product_name = uci:get(config_name, "main", "product_name") or "InvizBox Go"
+    uci:load("wizard")
+    local product_name = uci:get("wizard", "main", "product_name") or "InvizBox Go"
     if product_name == "InvizBox" then
-        config_name = "tor"
-        uci:load(config_name)
+        uci:load("tor")
         if selected_mode == "vpn" then
-            uci:set(config_name, "tor", "enabled", "0")
+            uci:set("tor", "tor", "enabled", "0")
         else
-            uci:set(config_name, "tor", "enabled", "1")
+            uci:set("tor", "tor", "enabled", "1")
         end
-        uci:save(config_name)
-        uci:commit(config_name)
+        uci:save("tor")
+        uci:commit("tor")
         sys.call("/etc/init.d/tor restart")
     end
-    config_name = "openvpn"
-    uci:load(config_name)
+    uci:load("openvpn")
     if selected_mode == "tor" or selected_mode == "extend" then
-        uci:set(config_name, "vpn", "enabled", "0")
+        uci:set("openvpn", "vpn", "enabled", "0")
     else
-        uci:set(config_name, "vpn", "enabled", "1")
+        uci:set("openvpn", "vpn", "enabled", "1")
     end
-    uci:save(config_name)
-    uci:commit(config_name)
+    uci:save("openvpn")
+    uci:commit("openvpn")
     sys.call("/etc/init.d/openvpn restart")
 end
 

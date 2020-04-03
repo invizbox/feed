@@ -1,13 +1,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=python3-ua-parser
-PKG_VERSION:=0.8.0
+PKG_VERSION:=0.9.0
 PKG_RELEASE:=1
 PKG_LICENSE:=PKG_LICENSE:=Apache-2.0
 
 PKG_SOURCE:=ua-parser-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://pypi.python.org/packages/b0/02/94ea43fc432fb112fbb62a89855317c41c210fb5239a2ed9b94ecb63024f/
-PKG_MD5SUM:=b73c5a86783e444afa2788075dddf48a
+PKG_SOURCE_URL:=https://files.pythonhosted.org/packages/91/f6/d574a5795c9776eb4ecf9a5f7ef191d31a89fbdf1cc3437b5d2efc26716c/
+PKG_HASH:=be17242abcd4f3d11543e9b82826f152b47c724623a32bb94ce02e549b0cfce2
 PKG_BUILD_DIR:=$(BUILD_DIR)/ua-parser-$(PKG_VERSION)
 
 include $(INCLUDE_DIR)/package.mk

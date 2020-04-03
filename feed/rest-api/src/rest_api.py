@@ -35,6 +35,7 @@ SYSLOG_HANDLER.setFormatter(FORMATTER)
 ROOT_LOGGER.addHandler(SYSLOG_HANDLER)
 LOGGER = logging.getLogger(__name__)
 
+ADMIN_PKG = "admin-interface"
 BLACKLISTS_PKG = "blacklists"
 DHCP_PKG = "dhcp"
 UPDATE_PKG = "update"
@@ -99,7 +100,9 @@ def allow_options_calls():
 
 def handle_usr1_signal(_signum, _frame):
     """ handling USR1 - used to reload VPN and udate configurations when modified """
-    LOGGER.info("reloading the blacklists, dhcp, update and vpn configuration as they have been updated")
+    LOGGER.info("reloading the admin-interface, blacklists, dhcp, update and vpn configuration as they have been"
+                " updated")
+    UCI_PLUGIN.uci.parse(ADMIN_PKG)
     UCI_PLUGIN.uci.parse(BLACKLISTS_PKG)
     UCI_PLUGIN.uci.parse(DHCP_PKG)
     UCI_PLUGIN.uci.parse(UPDATE_PKG)

@@ -3,11 +3,11 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=invizbox-htpdate
-PKG_VERSION:=1.2.0
+PKG_VERSION:=1.2.2
 PKG_RELEASE:=1
 PKG_SOURCE:=htpdate-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=http://www.vervest.org/htp/archive/c/
-PKG_MD5SUM:=9d5ca69be06edf5d535b52b5f790da4e
+PKG_HASH:=5f1f959877852abb3153fa407e8532161a7abe916aa635796ef93f8e4119f955
 PKG_LICENSE:=GPL-2.0+
 PKG_LICENSE_FILES:=
 

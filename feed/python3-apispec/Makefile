@@ -1,13 +1,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=python3-apispec
-PKG_VERSION:=1.0.0
+PKG_VERSION:=3.3.0
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT
 
 PKG_SOURCE:=apispec-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://files.pythonhosted.org/packages/67/15/346c04988dd67d36007e28145504c520491930c878b1f484a97b27a8f497/
-PKG_HASH:=57a7b81fd19fff0663a7e5ffd196eaea79b5364151ed2b65533be36d55e0229c
+PKG_SOURCE_URL:=https://files.pythonhosted.org/packages/9d/cf/a8cfa99650325487ad1efa20d9a14c44de3c45c6baf291bbeab8738e2256/
+PKG_HASH:=419d0564b899e182c2af50483ea074db8cb05fee60838be58bb4542095d5c08d
 PKG_BUILD_DIR:=$(BUILD_DIR)/apispec-$(PKG_VERSION)
 
 include $(INCLUDE_DIR)/package.mk

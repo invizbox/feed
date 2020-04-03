@@ -4,7 +4,6 @@
 -- Monitors the network to identify changes in available networks/interfaces and modifies routing tables accordingly
 
 local network = require "luci.model.network"
-local nixio = require "nixio"
 local utils = require "invizboxutils"
 local led = require "ledcontrol"
 local uci = require("uci").cursor()
@@ -71,16 +70,6 @@ function netwatch.set_status(option, status)
     return true
 end
 
-function netwatch.set_local_resolv(auto)
-    if auto then
-        os.execute("ln -sf /tmp/resolv.conf.auto /tmp/resolv.conf")
-        utils.log("set local resolv.conf to auto")
-    else
-        os.execute("ln -sf /etc/resolv.conf.normal /tmp/resolv.conf")
-        utils.log("set local resolv.conf to normal (dnsmasq)")
-    end
-end
-
 function netwatch.set_dnsmasq_uci(option_name)
     utils.log("enabling the following dhcp profile: "..option_name)
     local config_name = "dhcp"
@@ -101,41 +90,12 @@ function netwatch.set_time()
     os.execute("/etc/init.d/sysntpd restart")
 end
 
-function netwatch.tor_is_up()
-    local sock = nixio.socket("inet", "stream")
-    if sock and sock:connect("127.0.0.1", 9051) then
-        local res, data
-        res = utils.tor_request(sock, "AUTHENTICATE \"\"\r\n")
-        if not res then
-            return false
-        end
-        -- Is tor connected and circuits established
-        res, data = utils.tor_request(sock, "GETINFO network-liveness\r\n")
-        if not res then
-            return false
-        end
-        local status = string.sub(data, string.find(data, "=%w*"))
-        if status == "=up" then
-            sock:close()
-            return true
-        else
-            sock:close()
-            return false
-        end
-    else
-        sock:close()
-        return false
-    end
-end
-
 function netwatch.no_network()
     -- status and LED
     netwatch.set_status("wan", "Down")
     netwatch.set_status("vpn", "Down")
     netwatch.set_status("status", "No Internet Connection")
     led.not_connected()
-    -- DNS - order matters!!!
-    netwatch.set_local_resolv(true)
     netwatch.set_dnsmasq_uci("captive")
     -- routing
     netwatch.reset_iptables()
@@ -159,9 +119,7 @@ function netwatch.captive_portal()
     netwatch.set_status("vpn", "Down")
     netwatch.set_status("status", "Behind Captive Portal")
     led.captive()
-    -- DNS - order matters!!!
     netwatch.set_dnsmasq_uci("auto")
-    netwatch.set_local_resolv(false)
     -- routing
     netwatch.reset_iptables()
     os.execute("sysctl -w net.ipv4.ip_forward=1")
@@ -195,8 +153,6 @@ function netwatch.network_no_vpn_or_tor(vpn)
         netwatch.set_status("status", "No Tor Connection")
     end
     led.connected_not_secure()
-    -- DNS - order matters!!!
-    netwatch.set_local_resolv(true)
     netwatch.set_dnsmasq_uci("captive")
     -- set time
     netwatch.set_time()
@@ -211,7 +167,7 @@ function netwatch.network_no_vpn_or_tor(vpn)
             ':80 -m comment --comment "invizbox"')
     -- waiting
     while netwatch.running do
-        if not vpn and netwatch.tor_is_up() then
+        if not vpn and utils.tor_is_up() then
             utils.log("Tor service successfully connected, restarting to deal with it")
             break
         end
@@ -230,9 +186,7 @@ function netwatch.use_tor()
     netwatch.set_status("vpn", "Up")
     netwatch.set_status("status", "Secure Connection - Tor Active")
     led.secure()
-    -- DNS - order matters!!!
     netwatch.set_dnsmasq_uci("tor")
-    netwatch.set_local_resolv(false)
     -- set time
     netwatch.set_time()
     -- routing
@@ -242,8 +196,6 @@ function netwatch.use_tor()
             '-m comment --comment "invizbox"')
     os.execute('iptables -t nat -I PREROUTING -p udp -m multiport --sport 3478,19302 -j REDIRECT --to-ports 9999 '..
             '-m comment --comment "invizbox"')
-    os.execute('iptables -t nat -I PREROUTING -s '..netwatch.device_ip..'/24 -p udp --dport 53 -j DNAT '..
-            '--to-destination 172.31.1.1:9053 -m comment --comment "invizbox"')
     os.execute('iptables -t nat -I PREROUTING -s '..netwatch.dhcp_range..'/24 \\! -d '..netwatch.device_ip..
             ' -p tcp --syn -j DNAT --to-destination 172.31.1.1:9040 -m comment --comment "invizbox"')
     os.execute('iptables -t nat -I OUTPUT -d 10.192.0.0/16 -p tcp --syn -j DNAT --to-destination 172.31.1.1:9040 '..
@@ -265,9 +217,7 @@ function netwatch.use_extend()
     netwatch.set_status("vpn", "Up")
     netwatch.set_status("status", "Wifi Extender Mode (no VPN or Tor)")
     led.clear()
-    -- DNS - order matters!!!
     netwatch.set_dnsmasq_uci("auto")
-    netwatch.set_local_resolv(false)
     -- set time
     netwatch.set_time()
     -- routing
@@ -296,9 +246,7 @@ function netwatch.use_vpn()
     netwatch.set_status("vpn", "Up")
     netwatch.set_status("status", "Secure Connection - VPN Active")
     led.secure()
-    -- DNS - order matters!!!
     netwatch.set_dnsmasq_uci("vpn")
-    netwatch.set_local_resolv(false)
     -- set time
     netwatch.set_time()
     -- routing
@@ -339,9 +287,7 @@ function netwatch.cant_determine_portal()
     netwatch.set_status("vpn", "Down")
     netwatch.set_status("status", "Error with Internet Connection")
     led.error()
-    -- DNS - order matters!!!
     netwatch.set_dnsmasq_uci("auto")
-    netwatch.set_local_resolv(false)
     -- routing
     netwatch.reset_iptables()
     os.execute("sysctl -w net.ipv4.ip_forward=1")
@@ -402,7 +348,7 @@ function netwatch.main()
             utils.log("VPN mode - "..netwatch.vpn.." interface is up - using VPN configuration.")
             netwatch.use_vpn()
             return_value = 6
-        elseif mode == netwatch.tor_mode and netwatch.tor_is_up() then
+        elseif mode == netwatch.tor_mode and utils.tor_is_up() then
             utils.log("Tor mode - "..netwatch.tor.." interface is up - using Tor configuration.")
             netwatch.use_tor()
             return_value = 7

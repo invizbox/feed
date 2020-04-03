@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=netwatch
 PKG_VERSION:=1.2
-PKG_RELEASE:=4
+PKG_RELEASE:=6
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/netwatch
 
@@ -27,13 +27,13 @@ endef
 
 define Package/netwatch-mt7621
 $(call Package/netwatch/Default)
-	TITLE:=netwatch with LED for Invizbox Go
+	TITLE:=netwatch with LED for InvizBox Go
 	DEPENDS:=+netwatch-base +ledcontrol-mt7621
 endef
 
 define Package/netwatch-mt7620
 $(call Package/netwatch/Default)
-	TITLE:=netwatch with LED for Invizbox Go
+	TITLE:=netwatch with LED for InvizBox Go
 	DEPENDS:=+netwatch-base +ledcontrol-mt7620
 endef
 
@@ -64,7 +64,6 @@ define Package/netwatch-base/preinst
 # check if we are on real system
 if [ -z "$${IPKG_INSTROOT}" ]; then
 	cp /etc/config/devices /tmp/devices
-	ln -sf /tmp/resolv.conf /etc/resolv.conf
 fi
 exit 0
 endef

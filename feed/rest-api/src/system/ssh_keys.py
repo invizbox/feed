@@ -46,7 +46,7 @@ def put_ssh():
             with open("/etc/dropbear/authorized_keys", "w") as auth_keys_file:
                 for key in received_keys:
                     auth_keys_file.write(f"{key.strip()}\n")
-            run(["/etc/init.d/dropbear", "reload"])
+            run(["/etc/init.d/dropbear", "reload"], check=False)
         except (KeyError, UciException):
             response.status = 400
             return "Invalid content"

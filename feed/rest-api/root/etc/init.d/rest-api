@@ -7,7 +7,6 @@ APP=rest_api.py
 USE_PROCD=1
 
 start_service() {
-    ln -sf /etc/resolv.conf.normal /etc/resolv.conf 2>&1 >/dev/null
 	procd_open_instance rest-api
 	procd_set_param command /usr/lib/python3.6/site-packages/rest_api/${APP}
 	procd_set_param env JWT_SECRET=$(cat /etc/jwt_secret)

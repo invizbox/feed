@@ -22,6 +22,7 @@ local function add_device(section_name, mac_address, ip_address, name)
     if previous_device_name == nil or previous_device_name == "" then
         uci:set(config_name, section_name, "name", name)
     end
+    uci:set(config_name, section_name, "hostname", name)
     uci:save(config_name)
     uci:commit(config_name)
 end

@@ -63,7 +63,7 @@ function invizboxutils.s_download(url, file)
     return invizboxutils.success(invizboxutils.download(url, file))
 end
 
-function invizboxutils.post(url, content_type,  body)
+function invizboxutils.post(url, content_type,  body, file)
     local ssl = string.sub(url, 1, 5) == "https"
     local code = 0
     local headers = {
@@ -72,19 +72,30 @@ function invizboxutils.post(url, content_type,  body)
     }
     local resp
     for _ = 1, 3 do
-        local sink = ltn12.source.string(body)
-        if ssl then
-            resp, code, _, _ = http.request { method = "POST", url = url, source = sink, headers = headers }
+        local body_sink = ltn12.source.string(body)
+        if file ~= nil then
+            local response_sink = ltn12.sink.file(io.open(file, 'w'))
+            if ssl then
+                resp, code, _, _ = https.request { method = "POST", url = url, source = body_sink, headers = headers,
+                                                  sink = response_sink }
+            else
+                resp, code, _, _ = http.request { method = "POST", url = url, source = body_sink, headers = headers,
+                                                  sink = response_sink }
+            end
         else
-            resp, code, _, _ = http.request { method = "POST", url = url, source = sink, headers = headers }
+            if ssl then
+                resp, code, _, _ = https.request { method = "POST", url = url, source = body_sink, headers = headers}
+            else
+                resp, code, _, _ = http.request { method = "POST", url = url, source = body_sink, headers = headers}
+            end
         end
         if resp and (invizboxutils.success(code) or invizboxutils.redirect(code)) then
             break
         else
             if code then
-                invizboxutils.log("failed to download url "..url.." with code ["..code.."]")
+                invizboxutils.log("failed to post to url "..url.." with code ["..code.."]")
             else
-                invizboxutils.log("failed to download url "..url.." without error code - most likely captive")
+                invizboxutils.log("failed to post to url "..url.." without error code - most likely captive")
             end
         end
     end
@@ -95,8 +106,8 @@ function invizboxutils.post(url, content_type,  body)
     return code
 end
 
-function invizboxutils.s_post(url, content_type, body)
-    return invizboxutils.success(invizboxutils.post(url, content_type, body))
+function invizboxutils.s_post(url, content_type, body, file)
+    return invizboxutils.success(invizboxutils.post(url, content_type, body, file))
 end
 
 function invizboxutils.get_first_line(file)
@@ -168,9 +179,18 @@ end
 function invizboxutils.table_size(table)
     local size = 0
     for _, _ in pairs(table) do
-         size = size +1
+         size = size + 1
     end
     return size
+end
+
+function invizboxutils.table_contains(table, element)
+    for _, value in pairs(table) do
+        if element == value then
+            return true
+        end
+    end
+    return false
 end
 
 function invizboxutils.uci_characters(identifier)
@@ -241,18 +261,7 @@ function invizboxutils.tor_request(sock, command)
     if not sock:send(command) then
         return false, "Cannot send the command to Tor"
     end
-    local reply_table = {}
-    local resp = sock:recv(1000)
-    while resp do
-        table.insert(reply_table, resp)
-        if string.len(resp) < 1000 then break end
-        resp = sock:recv(1000)
-    end
-    local reply = table.concat(reply_table)
-
-    if not resp then
-        return false, "Cannot read the response from Tor"
-    end
+    local reply = sock:receive()
     local i, j = string.find(reply, "^%d%d%d")
     if j ~= 3 then
         return false, "Malformed response from Tor"
@@ -261,14 +270,39 @@ function invizboxutils.tor_request(sock, command)
     if code ~= "250" and (code ~= "650" or command ~= "") then
         return false, "Tor responded with an error: "..reply
     end
-
     return true, reply
+end
+
+function invizboxutils.tor_is_up()
+    local sock = socket.tcp()
+    if sock and sock:connect("127.0.0.1", 9051) then
+        local res, data
+        res = invizboxutils.tor_request(sock, "AUTHENTICATE \"\"\r\n")
+        if not res then
+            return false
+        end
+        -- Is tor connected and circuits established
+        res, data = invizboxutils.tor_request(sock, "GETINFO network-liveness\r\n")
+        if not res then
+            return false
+        end
+        local status = string.sub(data, string.find(data, "=%w*"))
+        if status == "=up" then
+            sock:close()
+            return true
+        else
+            sock:close()
+            return false
+        end
+    else
+        sock:close()
+        return false
+    end
 end
 
 function invizboxutils.get_vpn_interfaces()
     local vpn_list = {}
-    local config_name = "network"
-    uci:foreach(config_name, "interface", function(section)
+    uci:foreach("network", "interface", function(section)
         if string.sub(section[".name"], 1, 3) == "vpn" then
             vpn_list[section[".name"]] = section["ifname"]
         end
@@ -276,37 +310,64 @@ function invizboxutils.get_vpn_interfaces()
     return vpn_list
 end
 
-function invizboxutils.apply_vpn_config(some_uci, vpn_interface, tun_name, ipsec)
-    local config_name = "vpn"
-    some_uci:load(config_name)
-    local selected_server = some_uci:get(config_name, "active", vpn_interface)
-            or some_uci:get(config_name, "active", "name")
-    local tmp_file = "/tmp/open"..vpn_interface..".conf"
-    local final_filename = "/etc/openvpn/open"..vpn_interface..".conf"
-    if some_uci:get(config_name, selected_server) == "server" then
-        if some_uci:get(config_name, selected_server, "template") then
-            local template = some_uci:get(config_name, selected_server, "template")
-            local address = some_uci:get(config_name, selected_server, "address")
-            os.execute('sed "s/@SERVER_ADDRESS@/'..address..'/; s/@TUN@/'..tun_name..'/" '..template..' > '..tmp_file)
-            if ipsec then
-                some_uci:set("ipsec", vpn_interface, "gateway", address)
+function invizboxutils.apply_vpn_config(some_uci, vpn_interface, tun_name)
+    some_uci:load("vpn")
+    some_uci:load("admin-interface")
+    local selected_server = some_uci:get("vpn", "active", vpn_interface) or some_uci:get("vpn", "active", "name")
+    local selected_protocol = some_uci:get("admin-interface", "lan_vpn"..string.sub(vpn_interface, 5, 5), "protocol_id")
+    if some_uci:get("vpn", selected_server) == "server" and some_uci:get("vpn", selected_protocol) == "protocol" then
+        some_uci:load("openvpn")
+        some_uci:load("ipsec")
+        local address = some_uci:get("vpn", selected_server, "address")
+        local enabled = "0"
+        if some_uci:get("openvpn", vpn_interface, "enabled") == "1"
+                or some_uci:get("ipsec", vpn_interface, "enabled") == "1" then
+            enabled = "1"
+        end
+        if some_uci:get("vpn", selected_protocol, "vpn_protocol") == "OpenVPN" then
+            local tmp_file = "/tmp/open"..vpn_interface..".conf"
+            local final_file = "/etc/openvpn/open"..vpn_interface..".conf"
+            if some_uci:get("vpn", selected_protocol, "template") then
+                local template = some_uci:get("vpn", selected_protocol, "template")
+                os.execute('sed "s/@SERVER_ADDRESS@/'..address..'/; s/@TUN@/'..tun_name..'/" '..template..' > '
+                        ..tmp_file)
+            elseif some_uci:get("vpn", selected_protocol, "filename") then
+                local non_template_file = some_uci:get("vpn", selected_server, "filename")
+                os.execute('sed "s/@TUN@/'..tun_name..'/" '..non_template_file..' > '..tmp_file)
+            else
+                return false, 1
             end
-        elseif some_uci:get(config_name, selected_server, "filename") then
-            local non_template_filename = some_uci:get(config_name, selected_server, "filename")
-            os.execute('sed "s/@TUN@/'..tun_name..'/" '..non_template_filename..' > '..tmp_file)
-            if ipsec then
-                some_uci:set("ipsec", vpn_interface, "gateway", "invalid")
-                some_uci:set("ipsec", vpn_interface, "enabled", "0")
+            if os.execute("diff "..tmp_file.." "..final_file.." >/dev/null")~=0 then
+                os.execute("cp "..tmp_file.." "..final_file.. " >/dev/null")
+            end
+            some_uci:set("openvpn", vpn_interface, "enabled", enabled)
+            some_uci:set("ipsec", vpn_interface, "gateway", "invalid")
+            some_uci:set("ipsec", vpn_interface, "enabled", "0")
+        elseif some_uci:get("vpn", selected_protocol, "vpn_protocol") == "IKEv2" then
+            some_uci:set("openvpn", vpn_interface, "enabled", "0")
+            some_uci:set("ipsec", vpn_interface, "gateway", address)
+            some_uci:set("ipsec", vpn_interface, "enabled", enabled)
+        end
+        some_uci:load("dhcp")
+        local new_dns_servers = {}
+        for _, server in pairs(some_uci:get("dhcp", "vpn"..string.sub(vpn_interface, 5, 5), "server")) do
+            if not string.find(server, "@tun") then
+                table.insert(new_dns_servers, server)
             end
         end
-        if os.execute("diff "..tmp_file.." "..final_filename.." >/dev/null")~=0 and
-                os.execute("cp "..tmp_file.." "..final_filename.. " >/dev/null") == 0 then
-            return true
-        else
-            return false, 2
+        for _, server in pairs(some_uci:get("vpn", selected_protocol, "dns_server")) do
+            table.insert(new_dns_servers, server.."@"..tun_name)
         end
+        some_uci:set("dhcp", "vpn"..string.sub(vpn_interface, 5, 5), "server", new_dns_servers)
+        some_uci:save("dhcp")
+        some_uci:commit("dhcp")
+        some_uci:save("ipsec")
+        some_uci:commit("ipsec")
+        some_uci:save("openvpn")
+        some_uci:commit("openvpn")
+        return true
     else
-        return false, 3
+        return false, 2
     end
 end
 
@@ -361,9 +422,8 @@ function invizboxutils.nearest_usable_vpn_server_to_uci(json_content)
 end
 
 function invizboxutils.get_nearest_cities(module)
-    local config_name = "update"
-    uci:load(config_name)
-    local nearest_servers_url = uci:get(config_name, "server", "clear")..uci:get(config_name, "urls", "nearest_cities")
+    uci:load("update")
+    local nearest_servers_url = uci:get("update", "server", "clear")..uci:get("update", "urls", "nearest_cities")
     if (invizboxutils.s_download(nearest_servers_url, "/tmp/nearest.json")) then
         local json_content = invizboxutils.read_file("/tmp/nearest.json") or ""
         if string.match(json_content, ".*cities.*city.*city.*city.*") ~= nil
@@ -375,13 +435,8 @@ function invizboxutils.get_nearest_cities(module)
             uci:commit("vpn")
             -- notify rest-api and update vpn configs
             os.execute("kill -USR1 $(ps | grep [r]est_api | awk '{print $1}') 2>/dev/null")
-            local ipsec = uci:load("ipsec")
             for vpn_interface, tun_name in pairs(invizboxutils.get_vpn_interfaces()) do
-                invizboxutils.apply_vpn_config(uci, vpn_interface, tun_name, ipsec)
-            end
-            if ipsec then
-                uci:save("ipsec")
-                uci:commit("ipsec")
+                invizboxutils.apply_vpn_config(uci, vpn_interface, tun_name)
             end
             os.execute("/etc/init.d/openvpn restart")
             os.execute("/etc/init.d/ipsec restart")
@@ -390,6 +445,53 @@ function invizboxutils.get_nearest_cities(module)
             invizboxutils.log("Cannot identify nearest servers")
         end
     end
+end
+
+function invizboxutils.csv_to_uci(some_uci, filename, config_name, section_name)
+    local ovpn_template_location = "/etc/openvpn/templates/"
+    local first_line = true
+    local columns = {}
+    if not invizboxutils.file_exists(filename) then
+        return false, "Invalid filename "..filename
+    end
+    local successful_replacement = false
+    for line in io.lines(filename) do
+        if first_line then
+            for column_name in line:gmatch('([^,]+)') do
+                table.insert(columns, column_name)
+            end
+            first_line = false
+        else
+            local i = 1
+            local object_name
+            local protocol_list = {}
+            local dns_server_list = {}
+            for column_value in line:gmatch('([^,]+)') do
+                if i == 1 then
+                    object_name = invizboxutils.uci_characters(column_value)
+                    some_uci:set(config_name, object_name, section_name)
+                    successful_replacement = true
+                end
+                if columns[i] == "protocol_ids" then
+                    for protocol in column_value:gmatch('([^-]+)') do
+                        table.insert(protocol_list, protocol)
+                    end
+                    some_uci:set(config_name, object_name, "protocol_id", protocol_list)
+                elseif columns[i] == "dns_server_1" then
+                    table.insert(dns_server_list, column_value)
+                elseif columns[i] == "dns_server_2" then
+                    table.insert(dns_server_list, column_value)
+                    some_uci:set(config_name, object_name, "dns_server", dns_server_list)
+                elseif columns[i] == "template" then
+                    some_uci:set(config_name, object_name, columns[i], ovpn_template_location..column_value)
+                else
+                    some_uci:set(config_name, object_name, columns[i], column_value)
+                end
+                i = i + 1
+            end
+        end
+    end
+    return successful_replacement
 end
 
 return invizboxutils

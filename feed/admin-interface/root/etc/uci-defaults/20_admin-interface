@@ -12,12 +12,12 @@
 function version { printf "%03d%03d%03d" $(echo "$1" | tr '.' ' '); }
 
 pre_update_version=$(uci get update.version.firmware)
+provider=$(uci get update.urls.nearest_cities | cut -d '/' -f 3)
 if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
-    provider=$(uci get update.urls.nearest_cities | cut -d '/' -f 3)
-    config_load admin-interface
     uci set admin-interface.features=service
     if [ -z $(uci get admin-interface.features.onboarding_needed) ]; then
         local feature
+        config_load admin-interface
         config_get feature onboarding needed "true"
         uci set admin-interface.features.onboarding_needed=$feature
     fi
@@ -94,7 +94,6 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
         uci set admin-interface.lan_vpn3.protocol_id=openvpn_udp_1194
         uci set admin-interface.lan_vpn4.protocol_id=openvpn_udp_1194
     elif [ "${provider}" == "windscribe" ]; then
-        uci set admin-interface.features.ipsec_credentials_url='https://windscribe.com/getconfig/openvpn'
         uci set admin-interface.features.openvpn_credentials_url='https://windscribe.com/getconfig/openvpn'
         uci set admin-interface.features.separate_ipsec_credentials='true'
         uci set admin-interface.features.support_email=''
@@ -105,6 +104,33 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
         uci set admin-interface.lan_vpn2.protocol_id=openvpn_tcp_443
         uci set admin-interface.lan_vpn3.protocol_id=openvpn_tcp_443
         uci set admin-interface.lan_vpn4.protocol_id=openvpn_tcp_443
+    fi
+    uci commit admin-interface
+fi
+if [ $(version ${pre_update_version}) -lt $(version 0.1.0) ]; then
+    if [ "${provider}" == "expressvpn" ]; then
+        uci set admin-interface.features.separate_ipsec_credentials='true'
+        uci set admin-interface.features.ipsec_credentials_text='Click the "PPTP & L2TP/IPsec" button'
+        uci set admin-interface.features.openvpn_credentials_text='Click the "OpenVPN" button'
+    elif [ "${provider}" == "invizbox" ]; then
+        uci set admin-interface.features.ipsec_credentials_text='In the VPN Account section, click the "View VPN Password button"'
+        uci set admin-interface.features.openvpn_credentials_text='In the VPN Account section, click the "View VPN Password button"'
+    elif [ "${provider}" == "ipvanish" ]; then
+        uci set admin-interface.features.ipsec_credentials_text=''
+        uci set admin-interface.features.openvpn_credentials_text=''
+    elif [ "${provider}" == "nordvpn" ]; then
+        uci set admin-interface.features.ipsec_credentials_text=''
+        uci set admin-interface.features.openvpn_credentials_text=''
+    elif [ "${provider}" == "pia" ]; then
+        uci set admin-interface.features.ipsec_credentials_text=''
+        uci set admin-interface.features.openvpn_credentials_text=''
+    elif [ "${provider}" == "vanishedvpn" ]; then
+        uci set admin-interface.features.ipsec_credentials_text=''
+        uci set admin-interface.features.openvpn_credentials_text=''
+    elif [ "${provider}" == "windscribe" ]; then
+        uci set admin-interface.features.ipsec_credentials_url='https://windscribe.com/getconfig/ikev2'
+        uci set admin-interface.features.ipsec_credentials_text='Select any location, click on "Get Profile Details" and use the username and password'
+        uci set admin-interface.features.openvpn_credentials_text='Click on "Get Credentials" and use the username and password'
     fi
     uci commit admin-interface
 fi

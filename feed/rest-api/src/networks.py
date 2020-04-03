@@ -2,8 +2,7 @@
     https://www.invizbox.com/lic/license.txt
 """
 import logging
-from subprocess import run
-from os import system
+from subprocess import run, CalledProcessError
 from json.decoder import JSONDecodeError
 from bottle_jwt import jwt_auth_required
 from bottle import Bottle, request, response
@@ -75,7 +74,7 @@ def validate_network(network, uci):
             valid &= validate_option("string", new_location)
             locations, protocols = get_locations_protocols(uci)
             if "protocolId" in network["vpn"]:
-                valid &= network["vpn"]["protocolId"] in protocols
+                valid &= network["vpn"]["protocolId"] in protocols or network["vpn"]["protocolId"] == "filename"
             else:
                 network["vpn"]["protocolId"] = next(iter(protocols))
             valid &= validate_location(new_location, locations, network["vpn"]["protocolId"])
@@ -308,37 +307,53 @@ def update_network_vpn(uci, network_id, updated_network):
 
 def update_network_vpn_location(uci, network_id, updated_network):
     """ update the vpn part of a specific network """
-    vpn_uci = uci.get_package(VPN_PKG)
     entry_name = f"vpn_{network_id[-1]}"
-    for vpn in vpn_uci:
+    tunnel_interface = f"@tun{network_id[-1]}"
+    for vpn in uci.get_package(VPN_PKG):
         if vpn[".type"] == "active" and entry_name in vpn:
-            if vpn[entry_name] == updated_network["vpn"]["location"]:
-                LOGGER.info("current VPN config is already in use, no change")
-                break
+            new_server_id = updated_network["vpn"]["location"]
             try:
-                location_conf = uci.get_config(VPN_PKG, updated_network["vpn"]["location"])
-                uci.set_option(VPN_PKG, "active", entry_name, updated_network["vpn"]["location"])
+                server_conf = uci.get_config(VPN_PKG, new_server_id)
+                new_protocol_id = updated_network["vpn"]["protocolId"]
+                uci.set_option(VPN_PKG, "active", entry_name, new_server_id)
                 uci.persist(VPN_PKG)
-                with open("/tmp/vpn_location", "w") as out_file:
-                    if "template" in location_conf:
-                        run(["sed", f's/@SERVER_ADDRESS@/{location_conf["address"]}/; s/@TUN@/tun{network_id[-1]}/',
-                             f'{location_conf["template"]}'], stdout=out_file)
-                    elif "filename" in location_conf:
-                        run(["sed", f's/@TUN@/tun{network_id[-1]}/', f'{location_conf["filename"]}'], stdout=out_file)
-                if system(f"cp /tmp/vpn_location /etc/openvpn/openvpn_{network_id[-1]}.conf") == 0:
-                    LOGGER.info('%s is now the active VPN location for %s', updated_network["vpn"]["location"],
-                                entry_name)
+                if new_protocol_id == "filename":
+                    new_vpn_protocol = "OpenVPN"
+                    new_dns_servers = [server + tunnel_interface for server in uci.get_option(VPN_PKG, new_server_id,
+                                                                                              "dns_server")]
                 else:
-                    LOGGER.info('error setting %s as the VPN location for %s', updated_network["vpn"]["location"],
-                                entry_name)
-                if "template" in location_conf:
-                    uci.set_option(IPSEC_PKG, entry_name, "gateway", location_conf["address"])
-                else:
+                    new_vpn_protocol = uci.get_option(VPN_PKG, new_protocol_id, "vpn_protocol")
+                    new_dns_servers = [server + tunnel_interface for server in uci.get_option(VPN_PKG, new_protocol_id,
+                                                                                              "dns_server")]
+                if new_vpn_protocol == "OpenVPN":
+                    if new_protocol_id == "filename":
+                        template_file = server_conf["filename"]
+                        sed_line = f's/@TUN@/tun{network_id[-1]}/'
+                    else:
+                        template_file = uci.get_option(VPN_PKG, new_protocol_id, "template")
+                        sed_line = f's/@SERVER_ADDRESS@/{server_conf["address"]}/; s/@TUN@/tun{network_id[-1]}/'
+                    try:
+                        with open("/tmp/vpn_location", "w") as out_file:
+                            run(["sed", sed_line, template_file], stdout=out_file, check=True)
+                        run(["cp", "/tmp/vpn_location", f"/etc/openvpn/openvpn_{network_id[-1]}.conf"], check=True)
+                        LOGGER.info('%s (%s) is now the active VPN location for %s', new_server_id, new_vpn_protocol,
+                                    entry_name)
+                    except CalledProcessError:
+                        LOGGER.info('error setting %s as the VPN location for %s (%s)', new_server_id, new_vpn_protocol,
+                                    entry_name)
                     uci.set_option(IPSEC_PKG, entry_name, "gateway", "invalid")
                     uci.set_option(IPSEC_PKG, entry_name, "enabled", "0")
+                elif new_vpn_protocol == "IKEv2":
+                    uci.set_option(IPSEC_PKG, entry_name, "gateway", server_conf["address"])
                 uci.persist(IPSEC_PKG)
+                # change DNS servers if needed
+                local_dnsmasq_servers = [server for server in uci.get_option(DHCP_PKG, f"vpn{network_id[-1]}", "server")
+                                         if tunnel_interface not in server]
+                new_dns_servers = local_dnsmasq_servers + new_dns_servers
+                uci.set_option(DHCP_PKG, f"vpn{network_id[-1]}", "server", new_dns_servers)
+                uci.persist(DHCP_PKG)
             except UciException:
-                LOGGER.info('No VPN location named %s', updated_network["vpn"]["location"])
+                LOGGER.info('Error using new location %s', new_server_id)
             break
 
 
@@ -376,7 +391,7 @@ def update_network_admin(uci, network_id, updated_network):
                                "true" if updated_network["wifi"]["enabled24Ghz"] else "false")
                 uci.set_option(ADMIN_PKG, admin["id"], "enabled_5ghz",
                                "true" if updated_network["wifi"]["enabled5Ghz"] else "false")
-                if updated_network["type"] == "vpn":
+                if updated_network["type"] == "vpn" and updated_network["vpn"]["protocolId"] != "filename":
                     uci.set_option(ADMIN_PKG, admin["id"], "protocol_id", updated_network["vpn"]["protocolId"])
             elif updated_network["wifi"]["enabled5Ghz"] and admin["enabled_5ghz"] == "true":
                 uci.set_option(ADMIN_PKG, admin["id"], "enabled_5ghz", "false")
@@ -396,24 +411,24 @@ def update_network_profile(uci, network_id, current_profile_id, new_profile_id):
         new_profile = profiles.ALL_OFF_PROFILE
     reload_dropbear, reload_firewall = profiles.update_profile_network(uci, network_id, current_profile, new_profile)
     if reload_dropbear:
-        run(["/etc/init.d/dropbear", "reload"])
+        run(["/etc/init.d/dropbear", "reload"], check=False)
     if reload_firewall:
-        run(["/etc/init.d/firewall", "reload"])
+        run(["/etc/init.d/firewall", "reload"], check=False)
 
 
 def restart_processes(restart_dnsmasq, restart_network, restart_vpn):
     """ helper function to restart processes """
     with hold_ping():
         if restart_dnsmasq:
-            run(["/etc/init.d/dnsmasq", "reload"])
+            run(["/etc/init.d/dnsmasq", "reload"], check=False)
         if restart_network:
-            run(["/etc/init.d/network", "reload"])
+            run(["/etc/init.d/network", "reload"], check=False)
         if restart_vpn:
             # the following to make sure all tunnels are down if they need to be created by the other daemon
-            run(["/etc/init.d/openvpn", "stop"])
-            run(["/etc/init.d/ipsec", "stop"])
-            run(["/etc/init.d/openvpn", "start"])
-            run(["/etc/init.d/ipsec", "start"])
+            run(["/etc/init.d/openvpn", "stop"], check=False)
+            run(["/etc/init.d/ipsec", "stop"], check=False)
+            run(["/etc/init.d/openvpn", "start"], check=False)
+            run(["/etc/init.d/ipsec", "start"], check=False)
 
 
 def do_update_network(network, updated_network, uci):

@@ -98,11 +98,19 @@ def set_ftux(uci):
 def get_features(uci):
     """gets a list of features for the Administration Interface"""
     try:
+        try:
+            openvpn_credentials_text = uci.get_option(ADMIN_PKG, "features", "openvpn_credentials_text")
+        except UciException:
+            openvpn_credentials_text = ''
         openvpn_credentials_url = uci.get_option(ADMIN_PKG, "features", "openvpn_credentials_url")
+        try:
+            ipsec_credentials_text = uci.get_option(ADMIN_PKG, "features", "ipsec_credentials_text")
+        except UciException:
+            ipsec_credentials_text = ''
         ipsec_credentials_url = uci.get_option(ADMIN_PKG, "features", "ipsec_credentials_url")
         onboarding_nedeed = uci.get_option(ADMIN_PKG, "features", "onboarding_needed") == "true"
         separate_ipsec_credentials = uci.get_option(ADMIN_PKG, "features", "separate_ipsec_credentials") == "true"
-        ipsec_credentials_needed = not path.isfile("/private/ipsec_credentials.txt")
+        ipsec_credentials_needed = separate_ipsec_credentials and not path.isfile("/private/ipsec_credentials.txt")
         vpn_credentials_needed = not path.isfile("/private/vpn_credentials.txt")
         try:
             support_url = uci.get_option(ADMIN_PKG, "features", "support_url")
@@ -115,19 +123,27 @@ def get_features(uci):
         vpn_from_account = uci.get_option(ADMIN_PKG, "features", "vpn_from_account") == "true"
         vpn_status = uci.get_option(ADMIN_PKG, "features", "vpn_status") == "true"
         return {
-            "ipsecCredentialsUrl": ipsec_credentials_url,
+            "credentials": {
+                "ipsec": {
+                    "text": ipsec_credentials_text,
+                    "url": ipsec_credentials_url
+                },
+                "openvpn": {
+                    "text": openvpn_credentials_text,
+                    "url": openvpn_credentials_url
+                },
+                "separateIpsecCredentials": separate_ipsec_credentials,
+                "vpnFromAccount": vpn_from_account,
+            },
             'onboarding': {
                 "ipsecCredentials": ipsec_credentials_needed,
                 "needed": onboarding_nedeed,
                 "vpnCredentials": vpn_credentials_needed
             },
-            "openvpnCredentialsUrl": openvpn_credentials_url,
-            "separateIpsecCredentials": separate_ipsec_credentials,
             "support": {
                 "url": support_url,
                 "email": support_email
             },
-            "vpnFromAccount": vpn_from_account,
             "vpnStatus": vpn_status
         }
     except UciException:

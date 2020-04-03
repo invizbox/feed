@@ -24,7 +24,8 @@ def get_logfile(log_path):
         if not path.isfile(log_file):
             response.status = 404
             return "Non existent log file"
-        proc = run(["tail", "-n", "3000", log_file], stdout=PIPE, stderr=PIPE, universal_newlines=True, timeout=5)
+        proc = run(["tail", "-n", "3000", log_file], stdout=PIPE, stderr=PIPE, universal_newlines=True, timeout=5,
+                   check=False)
         return {"log": proc.stdout}
     except (TimeoutExpired, CalledProcessError) as exception:
         response.status = 404
@@ -36,7 +37,7 @@ def get_logfile(log_path):
 def get_systemlog():
     """Endpoint to get access to the system log"""
     try:
-        logread_process = run("logread", stdout=PIPE, stderr=PIPE, universal_newlines=True, timeout=5)
+        logread_process = run("logread", stdout=PIPE, stderr=PIPE, universal_newlines=True, timeout=5, check=False)
         return {"log": logread_process.stdout}
     except (TimeoutExpired, CalledProcessError) as exception:
         response.status = 400
@@ -48,7 +49,7 @@ def get_systemlog():
 def get_kernellog():
     """Endpoint to get access to the kernel log"""
     try:
-        logread_process = run("dmesg", stdout=PIPE, stderr=PIPE, universal_newlines=True, timeout=5)
+        logread_process = run("dmesg", stdout=PIPE, stderr=PIPE, universal_newlines=True, timeout=5, check=False)
         return {"log": logread_process.stdout}
     except (TimeoutExpired, CalledProcessError) as exception:
         response.status = 400

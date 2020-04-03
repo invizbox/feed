@@ -224,7 +224,7 @@ class Uci:
         """ change a value in memory """
         if not validate_option("string", option):
             raise UciException("Invalid option")
-        if not validate_option("string", value):
+        if not validate_option("string", value) and not validate_option("string_list", value):
             raise UciException("Invalid value")
         try:
             current_package = self.uci_config[package]
