@@ -2,9 +2,8 @@
 	https://www.invizbox.com/lic/license.txt
 -%>
 <%
-nixio = require("nixio")
+socket = require "socket"
 utils = require "invizboxutils"
-sock = nixio.socket("inet", "stream")
 %>
 
 <%+header%>
@@ -21,14 +20,15 @@ sock = nixio.socket("inet", "stream")
 <script type="text/javascript">setTimeout("location='<%=controller%>/invizbox/torstatus/status'", 6000)</script>
 <%- end -%>
 <%
-if sock and sock:connect("127.0.0.1", 9051) then
-	res, data = utils.tor_request("AUTHENTICATE \"\"\r\n")
+local my_socket = socket.tcp()
+if my_socket and my_socket:connect("127.0.0.1", 9051) then
+	local res, data = utils.tor_request(my_socket, "AUTHENTICATE \"\"\r\n")
 	if not res then
 		print(data)
 		return
 	end
 
-	res, data = utils.tor_request("GETINFO status/circuit-established\r\n")
+	res, data = utils.tor_request(my_socket, "GETINFO status/circuit-established\r\n")
 	if not res then
 		print(data)
 	else
@@ -40,41 +40,41 @@ if sock and sock:connect("127.0.0.1", 9051) then
 			print("Not connected to the Tor network<br/>")
 		end
 	end
-    res, data = utils.tor_request("GETINFO version\r\n")
+    res, data = utils.tor_request(my_socket, "GETINFO version\r\n")
     if not res then
         torstatus = data
     else
         print(string.match(data, "%d.%d.%d.%d+"))
         print(" : ")
     end
-    res, data = utils.tor_request("GETINFO status/version/current\r\n")
+    res, data = utils.tor_request(my_socket, "GETINFO status/version/current\r\n")
     if not res then
         torstatus = data
     else
         print(string.match(data,"%w+",string.find(data,"=")))
     end
 
-	res, data = utils.tor_request("GETINFO circuit-status\r\n")
+	res, data = utils.tor_request(my_socket, "GETINFO circuit-status\r\n")
 	if not res then
 		print(data)
         else
 		print("<br/><br/>Circuits:<pre>\n" .. string.gsub(string.gsub(string.gsub(data,"\r\n250 .+$",""),"^250\+[^\n]*",""),"\n.\r","") .. "</pre>\n")
 	end
-        res, data = utils.tor_request("SETEVENTS bw\r\n")
+        res, data = utils.tor_request(my_socket, "SETEVENTS bw\r\n")
         if not res then
                 print(data)
         end
-        res, data = utils.tor_request("")
+        res, data = utils.tor_request(my_socket, "")
         if not res then
                 print(data)
         else
                 print("<br/><br/>Bandwidth:<pre>\n" .. string.gsub(data,"^650 BW ","") .. "</pre>\n")
         end
-        res, data = utils.tor_request("SETEVENTS\r\n")
+        res, data = utils.tor_request(my_socket, "SETEVENTS\r\n")
         if not res then
                 print(data)
         end
-	res, data = utils.tor_request("QUIT\r\n")
+	res, data = utils.tor_request(my_socket, "QUIT\r\n")
 	if not res then
 		print(data)
 		return
@@ -82,7 +82,7 @@ if sock and sock:connect("127.0.0.1", 9051) then
 
 end
 
-sock:close()
+my_socket:close()
 %>
 
 <%+footer%>

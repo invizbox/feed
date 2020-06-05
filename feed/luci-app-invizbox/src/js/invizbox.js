@@ -20,6 +20,30 @@
           chooseCityDiv.css("display", "block");
         }
       });
+      var protocolInput = document.getElementById('cbid.vpn.active.protocol_id');
+      if (protocolInput) {
+        cityInput.change(function () {
+          var cityProtocols = JSON.parse($('#vpncity :selected').attr('protocols'));
+          var protocolOptions = protocolInput.options;
+          for (var i=0; i<protocolOptions.length; i++) {
+            if (cityProtocols.includes(protocolOptions[i].value)) {
+              protocolOptions[i].style.display = "";
+            } else {
+              protocolOptions[i].style.display = "none";
+            }
+          }
+          var previousProtocol = protocolInput.options[protocolInput.selectedIndex].value;
+          if (!cityProtocols.includes(previousProtocol)) {
+            protocolInput.value = cityProtocols[0];
+          }
+          var chooseProtocolDiv = protocolInput.parentElement.parentElement;
+          if (cityProtocols.length <= 1) {
+            chooseProtocolDiv.style.display = "none";
+          } else {
+            chooseProtocolDiv.style.display = "block";
+          }
+        });
+      }
       var selcity = $('#vpncity option:selected').attr('filtercountry');
       $('#vpncountry option[value*="' + selcity + '"]').prop('selected', 'selected').change();
       cityInput.val($('#activevpn').val()).change();
@@ -50,7 +74,7 @@
 function selectRandomCity() {
   var cityInput = $('#vpncity');
   const randomIndex = Math.floor(Math.random() * (cityInput.children().length));
-  cityInput.prop('value', cityInput.children()[randomIndex].value);
+  cityInput.val(cityInput.children()[randomIndex].value).change();
 }
 
 function stopTor() {
@@ -311,3 +335,20 @@ function wifiScan(reload) {
   }, 20 * 1000);
 
 }
+
+if (document.getElementById('cbid.wizard.main.manual_captive_mode')) {
+  var checkboxSection = document.getElementById('cbi-wizard-main-manual_captive_mode');
+  var saveButton = document.getElementsByClassName('cbi-button cbi-button-apply')[0];
+  var hideCheckBox = document.getElementById('hide-checkbox').value;
+  if (hideCheckBox === "1") {
+    checkboxSection.style.display = "none";
+    var showButton = document.getElementById('show-button').value;
+    if (showButton === "1") {
+      var activatePortalButton = document.createElement('div');
+      activatePortalButton.innerHTML = '<input id="activate-portal-button" type="button" class="btn btn-default" onclick="window.open(\'http://captiveportal.invizbox.com\');" value="Activate Captive Portal" />';
+      checkboxSection.parentElement.appendChild(activatePortalButton);
+    }
+    saveButton.style.display = "none";
+  }
+}
+

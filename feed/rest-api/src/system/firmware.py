@@ -32,9 +32,13 @@ def upload_firmware():
     upload.filename = "firmware.img.gz"
     upload.save("/tmp", overwrite=True, chunk_size=CHUNK_SIZE)
     sha256_handler_ = sha256()
-    with open("/tmp/firmware.img.gz", 'rb') as firmware_file:
-        for block in iter(lambda: firmware_file.read(CHUNK_SIZE), b''):
-            sha256_handler_.update(block)
+    try:
+        with open("/tmp/firmware.img.gz", 'rb') as firmware_file:
+            for block in iter(lambda: firmware_file.read(CHUNK_SIZE), b''):
+                sha256_handler_.update(block)
+    except FileNotFoundError:
+        response.status = 422
+        return "Error dealing with uploaded file."
     system("rm /tmp/*.img")
     if system(f"gunzip -c /tmp/firmware.img.gz > /tmp/{sha256_handler_.hexdigest()}.img") != 0 \
        or system(f"/sbin/sysupgrade --test /tmp/{sha256_handler_.hexdigest()}.img > /tmp/sysupgrade_test.txt") != 0 \

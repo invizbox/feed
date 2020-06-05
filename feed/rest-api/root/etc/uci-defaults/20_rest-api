@@ -17,6 +17,7 @@ uci commit rest-api
 
 openssl x509 -in /etc/lighttpd/inviz.box.pem -noout 2>/dev/null
 if [ $? -ne 0 ]; then
+    echo "Building inviz.box.pem" > /dev/kmsg
     openssl req \
     -x509 \
     -config /etc/openssl-inviz.box.config \
@@ -28,6 +29,9 @@ if [ $? -ne 0 ]; then
 
     # create pem file
     cat /tmp/inviz.box.key /tmp/inviz.box.crt > /etc/lighttpd/inviz.box.pem
+    fsync /etc/lighttpd/inviz.box.pem
+else
+    echo "Not rebuilding inviz.box.pem as it's already valid" > /dev/kmsg
 fi
 
 if [ ! -s /etc/jwt_secret ]; then
@@ -55,18 +59,6 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
         port=1194
     fi
 
-    set_protocol_id_if_missing()
-    {
-        local id
-        config_get id "$1" "protocol_id" "missing"
-        if [ "$id" == "missing" ]; then
-            uci add_list vpn.$1.protocol_id=$protocol_id
-            if [ "${provider}" == "windscribe" ]; then
-                uci add_list vpn.$1.protocol_id=ikev2_ipsec
-            fi
-        fi
-    }
-
     first_protocol_id=$(grep -m1 "config protocol" /etc/config/vpn | awk '{print $3}' | cut -d "'" -f 2)
     if [ "$first_protocol_id" == "" ]; then
         uci set vpn.$protocol_id=protocol
@@ -80,12 +72,15 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
             uci set vpn.ikev2_ipsec.port=50
         fi
     fi
-    servers=$(grep "config server" /etc/config/vpn | awk '{print $3}' | cut -d "'" -f 2)
-    for server in $servers
-    do
-        set_protocol_id_if_missing $server
-    done
     uci commit vpn
+    first_server=$(grep -m1 "config server" /etc/config/vpn | awk '{print $3}' | cut -d "'" -f 2)
+    if [ -z "$(uci get vpn.$first_server.protocol_id)" ]; then
+        if [ "${provider}" == "windscribe" ]; then
+            sed -i "s/\toption template/\tlist protocol_id '${protocol_id}'\n\tlist protocol_id 'ikev2_ipsec'\n\toption template/g" /etc/config/vpn
+        else
+            sed -i "s/\toption template/\tlist protocol_id '${protocol_id}'\n\toption template/g" /etc/config/vpn
+        fi
+    fi
 fi
 
 if [ $(version ${pre_update_version}) -lt $(version 0.1.0) ]; then

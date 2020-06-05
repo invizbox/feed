@@ -49,10 +49,11 @@ def get_locations_protocols(uci):
                     _add_server_id_to_protocol(locations[country][city], protocol, vpn["id"])
             elif "filename" in vpn:
                 _add_server_id_to_protocol(locations[country][city], "filename", vpn["id"])
+                protocols["filename"] = {"name": "From OVPN", "vpnProtocol": "OpenVPN"}
         elif vpn[".type"] == "protocol":
             protocols[vpn["id"]] = {
-                "vpnProtocol": vpn["vpn_protocol"],
-                "name": vpn["name"]
+                "vpnProtocol": vpn["vpn_protocol"] if "vpn_protocol" in vpn else "OpenVPN",
+                "name": vpn["name"] if "name" in vpn else "OpenVPN"
             }
     return locations, protocols
 

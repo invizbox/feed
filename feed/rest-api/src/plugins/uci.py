@@ -94,22 +94,6 @@ class Uci:
                 package = config_file_name.split("/")[-1]
                 for line in config_file:
                     line = line.strip()
-                    pattern = self.re_comment.search(line)
-                    if pattern:
-                        continue
-                    pattern = self.re_package.search(line)
-                    if pattern:
-                        # no need to parse it as it has to match the filename
-                        # package = self.uci_cleanup(pattern.group(1))
-                        continue
-                    pattern = self.re_config.search(line)
-                    if pattern:
-                        if option_config:
-                            package_config.append(option_config)
-                        option_type = self.uci_cleanup(pattern.group(1))
-                        option_name = self.uci_cleanup(pattern.group(2))
-                        option_config = {".type": option_type, "id": option_name}
-                        continue
                     pattern = self.re_option.search(line)
                     if pattern:
                         option_name = self.uci_cleanup(pattern.group(1))
@@ -124,6 +108,22 @@ class Uci:
                             option_config[list_name] = [list_value]
                         else:
                             option_config[list_name].append(list_value)
+                        continue
+                    pattern = self.re_config.search(line)
+                    if pattern:
+                        if option_config:
+                            package_config.append(option_config)
+                        option_type = self.uci_cleanup(pattern.group(1))
+                        option_name = self.uci_cleanup(pattern.group(2))
+                        option_config = {".type": option_type, "id": option_name}
+                        continue
+                    pattern = self.re_package.search(line)
+                    if pattern:
+                        # no need to parse it as it has to match the filename
+                        # package = self.uci_cleanup(pattern.group(1))
+                        continue
+                    pattern = self.re_comment.search(line)
+                    if pattern:
                         continue
                     if line != "":
                         raise UciException("Unknown Line: " + line)

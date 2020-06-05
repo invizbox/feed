@@ -3,8 +3,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-invizbox
-PKG_VERSION:=2.1
-PKG_RELEASE:=11
+PKG_VERSION:=2.2
+PKG_RELEASE:=4
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 
@@ -13,11 +13,12 @@ include $(INCLUDE_DIR)/package.mk
 define Package/$(PKG_NAME)
 	SECTION:=invizbox
 	CATEGORY:=InvizBox
-	DEPENDS:=+luci +luci-theme-material +luci-app-adblock +ca-bundle +ca-certificates +libustream-openssl
+	DEPENDS:=+luci +luci-theme-material +luci-app-adblock +ca-bundle +ca-certificates +libustream-openssl +ip-tiny
 	TITLE:=Configuration Wizard and InvizBox pages
 endef
 
 define Package/$(PKG_NAME)/conffiles
+	/etc/config/dns
 	/etc/config/wizard
 endef
 

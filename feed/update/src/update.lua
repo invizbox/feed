@@ -81,9 +81,9 @@ function update.get_current_locations()
     return pre_update_locations
 end
 
-function update.get_similar_locations(location)
+function update.get_similar_locations(some_uci, location)
     local same_country, same_location, all = {}, {}, {}
-    uci:foreach("vpn", "server", function(section)
+    some_uci:foreach("vpn", "server", function(section)
         table.insert(all, section[".name"])
         local country = update.country_table[section["country"]] or section["country"]
         if location and country == location["country"] and section["city"] == location["city"] then
@@ -97,6 +97,7 @@ end
 
 function update.change_locations_if_obsolete(pre_update_locations)
     uci:load("vpn")
+    uci:load("admin-interface")
     local replaced = false
     local interfaces = utils.get_vpn_interfaces()
     for vpn_interface, _ in pairs(interfaces) do
@@ -106,26 +107,32 @@ function update.change_locations_if_obsolete(pre_update_locations)
         if not current_location_name then
             local network_name = "lan_vpn"..string.sub(vpn_interface, 5, 5)
             local current_protocol_id = uci:get("admin-interface", network_name , "protocol_id")
+                    or uci:get("vpn", "active", "protocol_id")
             local location = pre_update_locations[current_location]
-            local same_location, same_country, all = update.get_similar_locations(location)
+            local same_location, same_country, all = update.get_similar_locations(uci, location)
             local new_location
-            if location then
+            if current_location == "NotInitialised" then
+                new_location =  all[math.random(#all)]
+            elseif location then
                 if #same_location ~= 0 then
                     new_location = same_location[math.random(#same_location)]
                 elseif #same_country ~= 0 then
                     new_location =  same_country[math.random(#same_country)]
                 end
-            elseif current_location == "NotInitialised" then
-                new_location =  all[math.random(#all)]
             end
             if new_location then
                 uci:set("vpn", "active", vpn_interface, new_location)
                 local new_location_protocol_ids = uci:get("vpn", new_location, "protocol_id")
                 if type(new_location_protocol_ids) == "table"
                         and not utils.table_contains(new_location_protocol_ids, current_protocol_id) then
-                    uci:set("admin-interface", network_name , "protocol_id", new_location_protocol_ids[1])
-                elseif new_location_protocol_ids ~= current_protocol_id then
-                    uci:set("admin-interface", network_name , "protocol_id", new_location_protocol_ids)
+                    if not uci:set("admin-interface", network_name , "protocol_id", new_location_protocol_ids[1]) then
+                        uci:set("vpn", "active", "protocol_id", new_location_protocol_ids[1])
+                    end
+            elseif type(new_location_protocol_ids) ~= "table"
+                        and new_location_protocol_ids ~= current_protocol_id then
+                    if not uci:set("admin-interface", network_name , "protocol_id", new_location_protocol_ids) then
+                        uci:set("vpn", "active", "protocol_id", new_location_protocol_ids)
+                    end
                 end
                 replaced = true
             end
@@ -141,8 +148,10 @@ function update.change_locations_if_obsolete(pre_update_locations)
         for vpn_interface, tun_name in pairs(interfaces) do
             utils.apply_vpn_config(uci, vpn_interface, tun_name)
         end
-        os.execute("/etc/init.d/openvpn restart")
-        os.execute("/etc/init.d/ipsec restart")
+        os.execute("/etc/init.d/ipsec stop")
+        os.execute("/etc/init.d/openvpn stop")
+        os.execute("/etc/init.d/openvpn start")
+        os.execute("/etc/init.d/ipsec start")
         utils.log("Updated locations which were missing after update to their closest match")
     end
 end
@@ -154,32 +163,31 @@ function update.deal_with_new_vpn_config(content_sha)
         utils.log("New VPN configurations have been downloaded")
 
         -- move templates and certificates
-        os.execute("mv /tmp/potential_configs/*.template "..ovpn_template_location.." 2>&1 | logger &")
-        os.execute("mv /tmp/potential_configs/*.crt /etc/openvpn 2>&1 | logger &")
+        os.execute("mv /tmp/potential_configs/*.template "..ovpn_template_location.." &> /var/log/opkg_update.log")
+        os.execute("mv /tmp/potential_configs/*.crt /etc/openvpn &> /var/log/opkg_update.log")
 
         -- get information from current locations if available
         local pre_update_locations = update.get_current_locations()
 
-        -- delete previous server entries and templated protocol entries
-        local config_name = "vpn"
-        uci:load(config_name)
-        uci:foreach(config_name, "server", function(s)
-            uci:delete(config_name, s['.name'])
-        end)
-        uci:foreach(config_name, "protocol", function(s)
-            if uci:get(config_name, s['.name'], "template") then
-                uci:delete(config_name, s['.name'])
+        -- delete previous server entries with protocol_id and all protocol entries
+        uci:load("vpn")
+        uci:foreach("vpn", "server", function(s)
+            if uci:get("vpn", s['.name'], "protocol_id") then
+                uci:delete("vpn", s['.name'])
             end
+        end)
+        uci:foreach("vpn", "protocol", function(s)
+            uci:delete("vpn", s['.name'])
         end)
 
         -- add new ones from CSV
-        local ok_s, changed_s = pcall(utils.csv_to_uci, uci, "/tmp/potential_configs/servers.csv", config_name,
+        local ok_s, changed_s = pcall(utils.csv_to_uci, uci, "/tmp/potential_configs/servers.csv", "vpn",
                 "server")
-        local ok_p, changed_p = pcall(utils.csv_to_uci, uci, "/tmp/potential_configs/protocols.csv", config_name,
+        local ok_p, changed_p = pcall(utils.csv_to_uci, uci, "/tmp/potential_configs/protocols.csv", "vpn",
                 "protocol")
         if ok_s and changed_s and ok_p and changed_p then
-            uci:save(config_name)
-            uci:commit(config_name)
+            uci:save("vpn")
+            uci:commit("vpn")
             update.change_locations_if_obsolete(pre_update_locations)
             utils.log("New VPN configurations are now in place")
         else
@@ -189,7 +197,9 @@ function update.deal_with_new_vpn_config(content_sha)
         uci:set("update", "active", "current_vpn_sha", content_sha) -- even if invalid, we've dealt with them
         uci:save("update")
         uci:commit("update")
+        return true
     end
+    return false
 end
 
 function update.update_vpn()
@@ -263,16 +273,15 @@ end
 function update.update_firmware()
     utils.log("Checking if new firmware is available.")
     if utils.s_download(update.config.new_firmware_version, "/tmp/latest_firmware_version.txt") then
-        local config_name = "update"
-        uci:load(config_name)
-        local current_version = uci:get(config_name, "version", "firmware")
+        uci:load("update")
+        local current_version = uci:get("update", "version", "firmware")
         local new_version = utils.get_first_line("/tmp/latest_firmware_version.txt")
         if update.new_version_higher(current_version, new_version) then
             if utils.file_exists("/etc/update/firmware/new_firmware-"..new_version.."-sysupgrade.bin") then
                 utils.log("We have already downloaded that update, finished for now.")
-                uci:set(config_name, "version", "new_firmware", new_version)
-                uci:save(config_name)
-                uci:commit(config_name)
+                uci:set("update", "version", "new_firmware", new_version)
+                uci:save("update")
+                uci:commit("update")
                 return 1
             else
                 utils.log("Downloading new firmware.")
@@ -289,9 +298,9 @@ function update.update_firmware()
                                 ..new_version.."-sysupgrade.bin")
                         utils.log("New firmware now available at /etc/update/firmware/new_firmware-"
                                 ..new_version.."-sysupgrade.bin")
-                        uci:set(config_name, "version", "new_firmware", new_version)
-                        uci:save(config_name)
-                        uci:commit(config_name)
+                        uci:set("update", "version", "new_firmware", new_version)
+                        uci:save("update")
+                        uci:commit("update")
                     else
                         utils.log("Downloaded binary doesn't match downloaded hash, will try again later")
                         return 2
@@ -335,7 +344,7 @@ function update.update_opkg()
         return 0
     else
         utils.log("Updating opkg via clearnet.")
-        os.execute("OPKG_CONF_DIR=/etc/opkg_clear opkg update > /var/log/opkg_update.log 2>&1")
+        os.execute("OPKG_CONF_DIR=/etc/opkg_clear opkg update &> /var/log/opkg_update.log")
         utils.log(utils.run_and_log("cat /var/log/opkg_update.log"))
         os.execute(upgrade_command)
         utils.log(utils.run_and_log("cat /var/log/opkg_upgrade.log"))
@@ -364,27 +373,25 @@ function update.update_vpn_status()
             end
         end
         if string.match(json_content, ".*registered.*expiry.*renewal.*") ~= nil then
-            local config_name = "vpn"
-            local option_type = "active"
-            uci:load(config_name)
+            uci:load("vpn")
             local registered = utils.hack_json(json_content, "registered")
             if (registered == "true") then
-                uci:set(config_name, option_type, "registered", "true")
+                uci:set("vpn", "active", "registered", "true")
             elseif (registered == "false") then
-                uci:set(config_name, option_type, "registered", "false")
+                uci:set("vpn", "active", "registered", "false")
             end
             local renewal = utils.hack_json(json_content, "renewal")
             if (renewal == "true") then
-                uci:set(config_name, option_type, "renewal", "true")
+                uci:set("vpn", "active", "renewal", "true")
             elseif (renewal == "false") then
-                uci:set(config_name, option_type, "renewal", "false")
+                uci:set("vpn", "active", "renewal", "false")
             end
             local expiry = utils.hack_json(json_content, "expiry")
             if (expiry ~= nil and expiry == "Never" or string.len(expiry) == 10 or string.len(expiry) == 11) then
-                uci:set(config_name, option_type, "expiry", expiry)
+                uci:set("vpn", "active", "expiry", expiry)
             end
-            uci:save(config_name)
-            uci:commit(config_name)
+            uci:save("vpn")
+            uci:commit("vpn")
             return true
         else
             utils.log("received invalid JSON from server")
@@ -398,17 +405,16 @@ end
 
 function update.version_only()
     if utils.s_download(update.config.new_firmware_version, "/tmp/latest_invizbox_version.txt") then
-        local config_name = "update"
-        uci:load(config_name)
-        local current_version = uci:get(config_name, "version", "firmware")
+        uci:load("update")
+        local current_version = uci:get("update", "version", "firmware")
         utils.log("current version: "..current_version)
         local new_version = utils.get_first_line("/tmp/latest_invizbox_version.txt")
         utils.log("new version: "..new_version)
         if update.new_version_higher(current_version, new_version) then
             utils.log("new version is higher - setting it in config")
-            uci:set(config_name, "version", "new_firmware", new_version)
-            uci:save(config_name)
-            uci:commit(config_name)
+            uci:set("update", "version", "new_firmware", new_version)
+            uci:save("update")
+            uci:commit("update")
         end
     end
 end
@@ -430,11 +436,10 @@ function update.update_blacklists()
                     utils.log("New backlists available in /tmp/new_blacklists")
 
                     -- delete previous blacklists
-                    local config_name = "blacklists"
-                    uci:load(config_name)
+                    uci:load("blacklists")
                     local section = "blacklist"
-                    uci:foreach(config_name, section, function(s)
-                        uci:delete(config_name, s['.name'])
+                    uci:foreach("blacklists", section, function(s)
+                        uci:delete("blacklists", s['.name'])
                     end)
 
                     -- add new ones from CSV
@@ -444,21 +449,21 @@ function update.update_blacklists()
                         local name, source, file, description = line:match(matching_regex)
                         if name ~= "name" then
                             local uci_name = utils.uci_characters(file:match(".*/(.*)"))
-                            uci:set(config_name, uci_name, "blacklist")
-                            uci:set(config_name, uci_name, "name", name)
-                            uci:set(config_name, uci_name, "source", source)
-                            uci:set(config_name, uci_name, "file", file)
-                            uci:set(config_name, uci_name, "description", description)
+                            uci:set("blacklists", uci_name, "blacklist")
+                            uci:set("blacklists", uci_name, "name", name)
+                            uci:set("blacklists", uci_name, "source", source)
+                            uci:set("blacklists", uci_name, "file", file)
+                            uci:set("blacklists", uci_name, "description", description)
                             successful_replacement = true
                         end
                     end
                     if successful_replacement then
-                        uci:save(config_name)
-                        uci:commit(config_name)
+                        uci:save("blacklists")
+                        uci:commit("blacklists")
                     end
 
                     -- move blacklists
-                    os.execute("mv /tmp/new_blacklists/* ".. blacklists_location.." 2>&1 | logger &")
+                    os.execute("mv /tmp/new_blacklists/* ".. blacklists_location.." &> /var/log/opkg_update.log")
 
                     uci:load("update")
                     uci:set("update", "active", "current_blacklists_sha", content_sha)

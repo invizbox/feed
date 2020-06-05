@@ -3,21 +3,15 @@
 
 local cbi = require "luci.cbi"
 local translate = require "luci.i18n"
-local uci = require("uci").cursor()
 local dispatcher = require "luci.dispatcher"
 local fs = require "nixio.fs"
 local sys = require "luci.sys"
 local map, account, vpnaccount, password
 
-local wizard_not_complete = uci:load("wizard") and uci:get("wizard", "main", "complete") == "false"
-
-----------------------------
---  MAP SECTION TO CONFIG FILE
-------------------------------
-
 map = cbi.Map("vpn", translate.translate("Account Details"))
 map.anonymous = true
-if wizard_not_complete then
+map:chain("wizard")
+if map.uci:get("wizard", "main", "complete") == "false" then
     map.redirect = dispatcher.build_url("wizard/complete")
 end
 

@@ -12,10 +12,12 @@ from plugins.uci import UciException
 from utils.validate import validate_option
 from admin_interface import hold_ping
 from system.vpn import get_locations_protocols
+from system.dns import replace_dnsmasq_servers
 import profiles
 
 ADMIN_PKG = "admin-interface"
 DHCP_PKG = "dhcp"
+DNS_PKG = "dns"
 IPSEC_PKG = "ipsec"
 NETWORK_PKG = "network"
 OPENVPN_PKG = "openvpn"
@@ -74,11 +76,18 @@ def validate_network(network, uci):
             valid &= validate_option("string", new_location)
             locations, protocols = get_locations_protocols(uci)
             if "protocolId" in network["vpn"]:
-                valid &= network["vpn"]["protocolId"] in protocols or network["vpn"]["protocolId"] == "filename"
+                valid &= network["vpn"]["protocolId"] in protocols
             else:
-                network["vpn"]["protocolId"] = next(iter(protocols))
+                network["vpn"]["protocolId"] = next(protocol for protocol in protocols if protocol != "filename")
             valid &= validate_location(new_location, locations, network["vpn"]["protocolId"])
-    except KeyError:
+        if network["type"] == "clear":
+            try:
+                valid &= validate_option("string", network["dnsProviderId"])
+                if network["dnsProviderId"] != "dhcp":
+                    valid &= uci.get_option(DNS_PKG, network["dnsProviderId"], ".type") == "servers"
+            except UciException:
+                valid = False
+    except (KeyError, TypeError):
         valid = False
     return valid
 
@@ -163,6 +172,8 @@ def get_networks_admin(uci, networks):
                         network["vpn"] = {}
                         network["vpn"]["protocolId"] = admin["protocol_id"]\
                             if "protocol_id" in admin else first_protocol
+                    if network["id"].startswith("lan_clear"):
+                        network["dnsProviderId"] = admin["dns_id"] if "dns_id" in admin else ""
                     break
 
 
@@ -285,8 +296,10 @@ def update_network_vpn(uci, network_id, updated_network):
     """ update the openvpn part of a specific network """
     for openvpn in uci.get_package(OPENVPN_PKG):
         if openvpn[".type"] == "openvpn" and network_id == f"lan_vpn{openvpn['id'][-1]}":
-            if updated_network["enabled"]\
-                    and uci.get_option(VPN_PKG, updated_network["vpn"]["protocolId"], "vpn_protocol") == "OpenVPN":
+            is_openvpn_network = (updated_network["vpn"]["protocolId"] == "filename" or
+                                  uci.get_option(VPN_PKG, updated_network["vpn"]["protocolId"], "vpn_protocol")
+                                  == "OpenVPN")
+            if updated_network["enabled"] and is_openvpn_network:
                 openvpn_enabled = "1"
             else:
                 openvpn_enabled = "0"
@@ -294,8 +307,11 @@ def update_network_vpn(uci, network_id, updated_network):
             break
     for ipsec in uci.get_package(IPSEC_PKG):
         if ipsec[".type"] == "remote" and network_id == f"lan_vpn{ipsec['id'][-1]}":
+            is_ikev2_network = (updated_network["vpn"]["protocolId"] != "filename" and
+                                uci.get_option(VPN_PKG, updated_network["vpn"]["protocolId"], "vpn_protocol")
+                                == "IKEv2")
             if updated_network["enabled"]\
-                    and uci.get_option(VPN_PKG, updated_network["vpn"]["protocolId"], "vpn_protocol") == "IKEv2":
+                    and is_ikev2_network:
                 ipsec_enabled = "1"
             else:
                 ipsec_enabled = "0"
@@ -365,6 +381,9 @@ def update_network_dhcp(uci, network_id, updated_network):
             uci.set_option(DHCP_PKG, dhcp["id"], "disabled", "0" if updated_network["enabled"] else "1")
         if dhcp[".type"] == "dnsmasq" and "disabled" in dhcp and network_id in dhcp["interface"]:
             disable_dnmasq = False
+            if updated_network["type"] == "clear":
+                dnsmasq_section = updated_network["id"][4:]
+                replace_dnsmasq_servers(uci, dnsmasq_section, updated_network["dnsProviderId"])
             for interface in dhcp["interface"]:
                 try:
                     if network_id == interface:  # network being currently modified
@@ -391,8 +410,10 @@ def update_network_admin(uci, network_id, updated_network):
                                "true" if updated_network["wifi"]["enabled24Ghz"] else "false")
                 uci.set_option(ADMIN_PKG, admin["id"], "enabled_5ghz",
                                "true" if updated_network["wifi"]["enabled5Ghz"] else "false")
-                if updated_network["type"] == "vpn" and updated_network["vpn"]["protocolId"] != "filename":
+                if updated_network["type"] == "vpn":
                     uci.set_option(ADMIN_PKG, admin["id"], "protocol_id", updated_network["vpn"]["protocolId"])
+                elif updated_network["type"] == "clear":
+                    uci.set_option(ADMIN_PKG, admin["id"], "dns_id", updated_network["dnsProviderId"])
             elif updated_network["wifi"]["enabled5Ghz"] and admin["enabled_5ghz"] == "true":
                 uci.set_option(ADMIN_PKG, admin["id"], "enabled_5ghz", "false")
     uci.persist(ADMIN_PKG)
@@ -453,20 +474,25 @@ def do_update_network(network, updated_network, uci):
         network["wifi"]["hidden"] = updated_network["wifi"]["hidden"]
         update_network_wireless(uci, network["id"], updated_network)
         restart_network = True
-    if network["dhcp"] != updated_network["dhcp"] or network["enabled"] != updated_network["enabled"]:
+    if network["dhcp"] != updated_network["dhcp"] or network["enabled"] != updated_network["enabled"] \
+            or (network["type"] == "clear" and network["dnsProviderId"] != updated_network["dnsProviderId"]):
         network["dhcp"] = updated_network["dhcp"]
         update_network_dhcp(uci, network["id"], updated_network)
         restart_dnsmasq = True
     if network["profileId"] != updated_network["profileId"]:
         update_network_profile(uci, network["id"], network["profileId"], updated_network["profileId"])
+    clear_with_new_dns = (network["type"] == "clear" and network["dnsProviderId"] != updated_network["dnsProviderId"])
+    vpn_with_new_protocol = (network["type"] == "vpn"
+                             and network["vpn"]["protocolId"] != updated_network["vpn"]["protocolId"])
     if network["name"] != updated_network["name"] or network["profileId"] != updated_network["profileId"] \
-            or network["wifi"] != updated_network["wifi"] \
-            or (network["type"] == "vpn" and network["vpn"]["protocolId"] != updated_network["vpn"]["protocolId"]):
+            or network["wifi"] != updated_network["wifi"] or clear_with_new_dns or vpn_with_new_protocol:
         network["name"] = updated_network["name"]
         network["profileId"] = updated_network["profileId"]
         network["wifi"]["enabled24Ghz"] = updated_network["wifi"]["enabled24Ghz"]
         network["wifi"]["enabled5Ghz"] = updated_network["wifi"]["enabled5Ghz"]
         update_network_admin(uci, network["id"], updated_network)
+    if network["type"] == "clear":
+        network["dnsProviderId"] = updated_network["dnsProviderId"]
     if network["type"] == "vpn" and (network["vpn"] != updated_network["vpn"]
                                      or network["enabled"] != updated_network["enabled"]):
         network["vpn"] = updated_network["vpn"]
@@ -526,8 +552,11 @@ def delete_network(network_id, uci, uci_rom):
     """ delete a specific network """
     LOGGER.debug("delete_network() called")
     if not NETWORKS_APP.wifi_password:
-        with open("/private/wifi_password.txt", "r") as password_file:
-            NETWORKS_APP.wifi_password = password_file.readline().rstrip()
+        try:
+            with open("/private/wifi_password.txt", "r") as password_file:
+                NETWORKS_APP.wifi_password = password_file.readline().rstrip()
+        except FileNotFoundError:
+            pass
     try:
         networks = get_networks(uci)
         network = next(network for network in networks

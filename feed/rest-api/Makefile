@@ -5,7 +5,7 @@ include $(INCLUDE_DIR)/version.mk
 
 PKG_NAME:=rest-api
 PKG_VERSION:=0.4
-PKG_RELEASE:=11
+PKG_RELEASE:=17
 
 include $(INCLUDE_DIR)/package.mk
 include ../../../packages/lang/python/python3-package.mk
@@ -52,7 +52,7 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/lib/upgrade/keep.d
 	$(INSTALL_DATA) files/rest-api.upgrade $(1)/lib/upgrade/keep.d/rest-api
 	$(SED) 's,%V,$(API_VERSION),g' $(1)/etc/config/rest-api
-	$(SED) 's,%V,$(API_VERSION),g' $(1)/etc/uci-defaults/20-rest-api
+	$(SED) 's,%V,$(API_VERSION),g' $(1)/etc/uci-defaults/20_rest-api
 endef
 
 define Package/$(PKG_NAME)/preinst

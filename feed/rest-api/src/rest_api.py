@@ -18,6 +18,7 @@ from plugins.plugin_jwt import JWT_PLUGIN
 from plugins.plugin_uci import UCI_PLUGIN
 from profiles import PROFILES_APP
 from system.blacklists import BLACKLISTS_APP
+from system.dns import DNS_APP
 from system.firmware import FIRMWARE_APP
 from system.info import INFO_APP
 from system.logs import LOGS_APP
@@ -46,6 +47,7 @@ BOTTLE_APP.install(JWT_PLUGIN)
 BOTTLE_APP.merge(AUTH_APP)
 BOTTLE_APP.merge(BLACKLISTS_APP)
 BOTTLE_APP.merge(DEVICES_APP)
+BOTTLE_APP.merge(DNS_APP)
 BOTTLE_APP.merge(FIRMWARE_APP)
 BOTTLE_APP.merge(ADMIN_INTERFACE_APP)
 BOTTLE_APP.merge(INFO_APP)
@@ -98,15 +100,21 @@ def allow_options_calls():
     """Special route to deal with CORS from external callers on all API routes"""
 
 
+@BOTTLE_APP.route('/<:re:.*>', method=['DEL', 'GET', 'POST', 'PUT'])
+def explicit_404():
+    """Special route to deal with CORS route matching all and sending back 405"""
+    response.status = 404
+
+
 def handle_usr1_signal(_signum, _frame):
     """ handling USR1 - used to reload VPN and udate configurations when modified """
     LOGGER.info("reloading the admin-interface, blacklists, dhcp, update and vpn configuration as they have been"
                 " updated")
+    UCI_PLUGIN.uci.parse(VPN_PKG)
     UCI_PLUGIN.uci.parse(ADMIN_PKG)
     UCI_PLUGIN.uci.parse(BLACKLISTS_PKG)
     UCI_PLUGIN.uci.parse(DHCP_PKG)
     UCI_PLUGIN.uci.parse(UPDATE_PKG)
-    UCI_PLUGIN.uci.parse(VPN_PKG)
     # handle consequences of external changes like blacklists or VPN servers have changed
     PROFILES_APP.lists_rebuild_flag = True
 

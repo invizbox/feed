@@ -134,3 +134,14 @@ if [ $(version ${pre_update_version}) -lt $(version 0.1.0) ]; then
     fi
     uci commit admin-interface
 fi
+if [ $(version ${pre_update_version}) -lt $(version 0.1.5) ]; then
+    uci set admin-interface.lan_vpn1.protocol_id="$(uci -d '-' get admin-interface.lan_vpn1.protocol_id | cut -d '-' -f 1)"
+    uci set admin-interface.lan_vpn2.protocol_id="$(uci -d '-' get admin-interface.lan_vpn2.protocol_id | cut -d '-' -f 1)"
+    uci set admin-interface.lan_vpn3.protocol_id="$(uci -d '-' get admin-interface.lan_vpn3.protocol_id | cut -d '-' -f 1)"
+    uci set admin-interface.lan_vpn4.protocol_id="$(uci -d '-' get admin-interface.lan_vpn4.protocol_id | cut -d '-' -f 1)"
+    uci set admin-interface.lan_clear1.dns_id="dhcp"
+    uci set admin-interface.lan_clear2.dns_id="dhcp"
+    uci set admin-interface.invizbox=local_network
+    uci set admin-interface.invizbox.dns_id="dhcp"
+    uci commit admin-interface
+fi

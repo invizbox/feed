@@ -9,6 +9,7 @@ local fastest_ping = {}
 
 function fastest_ping.overall()
     local ping_processes = {}
+    uci:load("vpn")
     uci:foreach("vpn", "server", function(section)
         if section["address"] then
             local hand = io.popen("ping -c 1 -q -s 16 -w 1 -W 1 "..section["address"].." | awk -F'/' '/avg/{print $4}'")
@@ -30,6 +31,7 @@ end
 
 function fastest_ping.in_country(country)
     local ping_processes = {}
+    uci:load("vpn")
     uci:foreach("vpn", "server", function(section)
         if section["address"] and section["country"] == country then
             local hand = io.popen("ping -c 1 -q -s 16 -w 1 -W 1 "..section["address"].." | awk -F'/' '/avg/{print $4}'")
@@ -51,6 +53,7 @@ end
 
 function fastest_ping.in_city(city)
     local ping_processes = {}
+    uci:load("vpn")
     uci:foreach("vpn", "server", function(section)
         if section["address"] and section["city"] == city then
             local hand = io.popen("ping -c 1 -q -s 16 -w 1 -W 1 "..section["address"].." | awk -F'/' '/avg/{print $4}'")

@@ -9,6 +9,7 @@ local http = require "socket.http"
 local https = require "ssl.https"
 local socket = require "socket"
 local ltn12 = require "ltn12"
+local os = require "os"
 local uci = require("uci").cursor()
 local _ubus = require "ubus"
 
@@ -258,10 +259,16 @@ function invizboxutils.wifi_networks()
 end
 
 function invizboxutils.tor_request(sock, command)
+    -- implementing tor control-spec.txt -especially the 2.3 section about protocol format
     if not sock:send(command) then
         return false, "Cannot send the command to Tor"
     end
-    local reply = sock:receive()
+    local reply_table = {}
+    repeat
+        local resp = sock:receive("*l")
+        table.insert(reply_table, resp)
+    until(not resp or string.sub(resp, 4, 4) == ' ')
+    local reply = table.concat(reply_table, "\r\n")
     local i, j = string.find(reply, "^%d%d%d")
     if j ~= 3 then
         return false, "Malformed response from Tor"
@@ -274,30 +281,8 @@ function invizboxutils.tor_request(sock, command)
 end
 
 function invizboxutils.tor_is_up()
-    local sock = socket.tcp()
-    if sock and sock:connect("127.0.0.1", 9051) then
-        local res, data
-        res = invizboxutils.tor_request(sock, "AUTHENTICATE \"\"\r\n")
-        if not res then
-            return false
-        end
-        -- Is tor connected and circuits established
-        res, data = invizboxutils.tor_request(sock, "GETINFO network-liveness\r\n")
-        if not res then
-            return false
-        end
-        local status = string.sub(data, string.find(data, "=%w*"))
-        if status == "=up" then
-            sock:close()
-            return true
-        else
-            sock:close()
-            return false
-        end
-    else
-        sock:close()
-        return false
-    end
+    local command=[[AUTHENTICATE \"\"\r\nGETINFO network-liveness\r\nQUIT\r\n]]
+    return os.execute("echo -e \""..command.."\" 2>/dev/null | nc 127.0.0.1 9051 2>/dev/null | grep -q =up") == 0
 end
 
 function invizboxutils.get_vpn_interfaces()
@@ -315,7 +300,9 @@ function invizboxutils.apply_vpn_config(some_uci, vpn_interface, tun_name)
     some_uci:load("admin-interface")
     local selected_server = some_uci:get("vpn", "active", vpn_interface) or some_uci:get("vpn", "active", "name")
     local selected_protocol = some_uci:get("admin-interface", "lan_vpn"..string.sub(vpn_interface, 5, 5), "protocol_id")
-    if some_uci:get("vpn", selected_server) == "server" and some_uci:get("vpn", selected_protocol) == "protocol" then
+                                  or some_uci:get("vpn", "active", "protocol_id")
+    if some_uci:get("vpn", selected_server) == "server" and
+        (selected_protocol == "filename" or some_uci:get("vpn", selected_protocol) == "protocol") then
         some_uci:load("openvpn")
         some_uci:load("ipsec")
         local address = some_uci:get("vpn", selected_server, "address")
@@ -324,16 +311,16 @@ function invizboxutils.apply_vpn_config(some_uci, vpn_interface, tun_name)
                 or some_uci:get("ipsec", vpn_interface, "enabled") == "1" then
             enabled = "1"
         end
-        if some_uci:get("vpn", selected_protocol, "vpn_protocol") == "OpenVPN" then
+        if selected_protocol == "filename" or some_uci:get("vpn", selected_protocol, "vpn_protocol") == "OpenVPN" then
             local tmp_file = "/tmp/open"..vpn_interface..".conf"
             local final_file = "/etc/openvpn/open"..vpn_interface..".conf"
-            if some_uci:get("vpn", selected_protocol, "template") then
+            if selected_protocol == "filename" then
+                local non_template_file = some_uci:get("vpn", selected_server, "filename")
+                os.execute('sed "s/@TUN@/'..tun_name..'/" '..non_template_file..' > '..tmp_file)
+            elseif some_uci:get("vpn", selected_protocol, "template") then
                 local template = some_uci:get("vpn", selected_protocol, "template")
                 os.execute('sed "s/@SERVER_ADDRESS@/'..address..'/; s/@TUN@/'..tun_name..'/" '..template..' > '
                         ..tmp_file)
-            elseif some_uci:get("vpn", selected_protocol, "filename") then
-                local non_template_file = some_uci:get("vpn", selected_server, "filename")
-                os.execute('sed "s/@TUN@/'..tun_name..'/" '..non_template_file..' > '..tmp_file)
             else
                 return false, 1
             end
@@ -355,7 +342,11 @@ function invizboxutils.apply_vpn_config(some_uci, vpn_interface, tun_name)
                 table.insert(new_dns_servers, server)
             end
         end
-        for _, server in pairs(some_uci:get("vpn", selected_protocol, "dns_server")) do
+        local dns_section = selected_protocol
+        if selected_protocol == "filename" then
+            dns_section = selected_server
+        end
+        for _, server in pairs(some_uci:get("vpn", dns_section, "dns_server")) do
             table.insert(new_dns_servers, server.."@"..tun_name)
         end
         some_uci:set("dhcp", "vpn"..string.sub(vpn_interface, 5, 5), "server", new_dns_servers)
@@ -410,7 +401,7 @@ function invizboxutils.nearest_usable_vpn_server_to_uci(json_content)
         end
         if next(usable_servers) ~= nil then
             math.randomseed(os.time())
-            for _, entry in pairs({"vpn", "vpn_1", "vpn_2", "vpn_3", "vpn_4"}) do
+            for _, entry in pairs({"vpn_0", "vpn_1", "vpn_2", "vpn_3", "vpn_4"}) do
                 if uci:get(config_name, "active", entry) then
                     local random_server = usable_servers[math.random(#usable_servers)]
                     uci:set(config_name, "active", entry, random_server)

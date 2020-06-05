@@ -3,8 +3,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=netwatch
-PKG_VERSION:=1.2
-PKG_RELEASE:=6
+PKG_VERSION:=2.0
+PKG_RELEASE:=1
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/netwatch
 
@@ -39,8 +39,10 @@ endef
 
 define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)/src
+	mkdir -p $(PKG_BUILD_DIR)/bin
 	mkdir -p $(PKG_BUILD_DIR)/root
 	$(CP) ./src/* $(PKG_BUILD_DIR)/src/
+	$(CP) ./bin/* $(PKG_BUILD_DIR)/bin/
 	$(CP) ./root/* $(PKG_BUILD_DIR)/root/
 endef
 
@@ -55,6 +57,8 @@ endef
 define Package/netwatch-base/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/* $(1)/usr/lib/lua/
+	$(INSTALL_DIR) $(1)/bin
+	$(CP) $(PKG_BUILD_DIR)/bin/* $(1)/bin/
 	$(INSTALL_DIR) $(1)/
 	$(CP) $(PKG_BUILD_DIR)/root/* $(1)/
 endef

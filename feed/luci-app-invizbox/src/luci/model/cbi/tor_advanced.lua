@@ -5,17 +5,15 @@ local cbi = require "luci.cbi"
 local translate = require "luci.i18n"
 local fs = require "nixio.fs"
 
-local map = cbi.Map("system", translate.translate("Tor Advanced Configuration"), translate.translate(""))
+local map = cbi.Map("system", translate.translate("Tor Advanced Configuration"), "")
 map:chain("luci")
 
-local section = map:section(cbi.TypedSection, "system", translate.translate(""))
+local section = map:section(cbi.NamedSection, "system", "system", "", translate.translate("Torrc Configuration"))
 section.anonymous = true
 section.addremove = false
 
---[[======================= TORRC CONFIG ===============]]--
-local torrc_config = section:option(cbi.TextValue, "_data", translate.translate("Torrc Configuration"),
-    translate.translate("Advanced configuration of the Tor configuration. "
-            .."Be very careful, here be dragons. Touch at your own peril"))
+local torrc_config = section:option(cbi.TextValue, "_data", "", translate.translate("Advanced configuration of the"..
+        " Tor configuration. Be very careful, here be dragons. Touch at your own peril"))
 torrc_config.wrap    = "off"
 torrc_config.rows    = 30
 torrc_config.cleanempty = true

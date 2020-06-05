@@ -17,18 +17,3 @@ start_service() {
 	procd_append_param respawn 0
 	procd_close_instance
 }
-
-reload_service() {
-	echo "/etc/init.d/netwatch - $1 interface changed - restarting netwatch!" | logger -t netwatch
-	restart
-}
-
-service_triggers() {
-	procd_open_trigger
-	procd_add_interface_trigger "interface.*" vpn /etc/init.d/netwatch reload vpn
-	procd_add_interface_trigger "interface.*" wan /etc/init.d/netwatch reload wan
-	procd_add_interface_trigger "interface.*" tor /etc/init.d/netwatch reload tor
-	procd_add_reload_trigger "vpn"
-	procd_add_reload_trigger "netwatch"
-	procd_close_trigger
-}

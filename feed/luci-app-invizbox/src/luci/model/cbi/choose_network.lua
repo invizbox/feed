@@ -4,20 +4,15 @@
 local cbi = require "luci.cbi"
 local sys = require "luci.sys"
 local translate = require "luci.i18n"
-local uci = require("uci").cursor()
 local dispatcher = require "luci.dispatcher"
 local utils = require("invizboxutils")
 
 local map, station, ssid, encryption, key, hidden_network, dummy_value
-local wizard_not_complete = uci:load("wizard") and uci:get("wizard", "main", "complete") == "false"
-
-------------------------------
---  MAP SECTION TO CONFIG FILE
-------------------------------
 
 map = cbi.Map("wireless", translate.translate("Choose Network"))
 map.anonymous = true
-if wizard_not_complete then
+map:chain("wizard")
+if map.uci:get("wizard", "main", "complete") == "false" then
     map.redirect = dispatcher.build_url("wizard/complete")
 end
 
@@ -52,12 +47,12 @@ function map.on_before_save(self)
     self:del("wan", "disabled")
     local config_name = "known_networks"
     local section_name = utils.uci_characters(ssid:formvalue("wan"))
-    uci:load(config_name)
-    uci:set(config_name, section_name, "network")
-    uci:set(config_name, section_name, "ssid", ssid:formvalue("wan"))
-    uci:set(config_name, section_name, "key", key:formvalue("wan"))
-    uci:save(config_name)
-    uci:commit(config_name)
+    map.uci:load(config_name)
+    map.uci:set(config_name, section_name, "network")
+    map.uci:set(config_name, section_name, "ssid", ssid:formvalue("wan"))
+    map.uci:set(config_name, section_name, "key", key:formvalue("wan"))
+    map.uci:save(config_name)
+    map.uci:commit(config_name)
     sys.call("/etc/init.d/wifiwatch restart")
 end
 

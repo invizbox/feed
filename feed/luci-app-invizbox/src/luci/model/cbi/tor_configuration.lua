@@ -5,15 +5,15 @@ local cbi = require "luci.cbi"
 local translate = require "luci.i18n"
 local fs = require "nixio.fs"
 local sys = require("luci.sys")
-local nixio = require("nixio")
+local socket = require "socket"
 local utils = require "invizboxutils"
 
 local bNewIdentity = 0  -- to only reset new identity
-local map = cbi.Map("system", translate.translate("Tor Status and Configuration"), translate.translate(""))
+local map = cbi.Map("system", translate.translate("Tor Status and Configuration"), "")
 
 map:chain("luci")
 
-local section = map:section(cbi.TypedSection, "system", translate.translate(""))
+local section = map:section(cbi.TypedSection, "system", "")
 section.anonymous = true
 section.addremove = false
 
@@ -26,7 +26,7 @@ function section.on_apply(_, _)
 end
 
 --[[=======================TOR STATUS===============]]--
-local tor_restart_button = section:taboption("torstatus", cbi.Button, "_restart", translate.translate(""))
+local tor_restart_button = section:taboption("torstatus", cbi.Button, "_restart", "")
 tor_restart_button.inputtitle = translate.translate("Restart Tor")
 tor_restart_button.inputstyle = "apply"
 tor_restart_button.template = "cbi/start_button"
@@ -34,7 +34,7 @@ function tor_restart_button.write(_, _)
     sys.call('logger "restarting tor"; /etc/init.d/tor restart')
 end
 
-local tor_stop_button = section:taboption("torstatus", cbi.Button, "_stop", translate.translate(""))
+local tor_stop_button = section:taboption("torstatus", cbi.Button, "_stop", "")
 tor_stop_button.inputtitle = translate.translate("Stop Tor")
 tor_stop_button.template = "cbi/middle_button"
 tor_stop_button.inputstyle = "link"
@@ -48,7 +48,7 @@ tor_new_identity.template = "cbi/end_button"
 tor_new_identity.inputstyle = "link"
 function tor_new_identity.write()
     local return_string = ""
-    local sock = nixio.socket("inet", "stream")
+    local sock = socket.tcp()
     if sock and sock:connect("127.0.0.1", 9051) then
         local res, data = utils.tor_request(sock, "AUTHENTICATE \"\"\r\n")
         if not res then
@@ -73,7 +73,7 @@ tor_status.template = "cbi/label"
 tor_status.refresh = true
 function tor_status.cfgvalue()
     local return_string = ""
-    local sock = nixio.socket("inet", "stream")
+    local sock = socket.tcp()
     if sock and sock:connect("127.0.0.1", 9051) then
         local res, data = utils.tor_request(sock, "AUTHENTICATE \"\"\r\n")
         if not res then
@@ -109,7 +109,7 @@ tor_rec.legend = "Tor Version"
 tor_rec.template = "cbi/label"
 function tor_rec.cfgvalue()
     local return_string = ""
-    local sock = nixio.socket("inet", "stream")
+    local sock = socket.tcp()
     if sock and sock:connect("127.0.0.1", 9051) then
         local res, data = utils.tor_request(sock, "AUTHENTICATE \"\"\r\n")
         if not res then
@@ -155,7 +155,7 @@ tor_circ.scroll = true
 tor_circ.refresh = true
 function tor_circ.cfgvalue()
     local return_string
-    local sock = nixio.socket("inet", "stream")
+    local sock = socket.tcp()
     if sock and sock:connect("127.0.0.1", 9051) then
         local data
         local res, _ = utils.tor_request(sock, "AUTHENTICATE \"\"\r\n")

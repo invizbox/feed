@@ -1,11 +1,7 @@
 -- Copyright 2016 InvizBox Ltd
 -- https://www.invizbox.com/lic/license.txt
 
-------------------------------
---  MAP SECTION TO CONFIG FILE
-------------------------------
 local cbi = require "luci.cbi"
-local uci = require "uci".cursor()
 local translate = require "luci.i18n"
 local sys = require "luci.sys"
 local dispatcher = require "luci.dispatcher"
@@ -14,9 +10,8 @@ local map, access_point, ssid, pass, dummyvalue, hidden, isolate
 
 map = cbi.Map("wireless", translate.translate("Hotspot"))
 map.anonymous = true
-
-uci:load("wizard")
-local product_name = uci:get("wizard", "main", "product_name") or "InvizBox Go"
+map:chain("wizard")
+local product_name = map.uci:get("wizard", "main", "product_name") or "InvizBox Go"
 
 access_point = map:section(cbi.NamedSection, "lan", "wifi-iface", "", translate.translate("Name the "..product_name..
         " Wifi Hotspot"))
@@ -55,10 +50,10 @@ isolate.template = "cbi/flag"
 function map.on_commit()
     sys.user.setpasswd(dispatcher.context.authuser, pass:formvalue("lan"))
     local config_name = "wireless"
-    uci:load(config_name)
-    uci:set(config_name, "lan", "encryption", "psk-mixed")
-    uci:save(config_name)
-    uci:commit(config_name)
+    map.uci:load(config_name)
+    map.uci:set(config_name, "lan", "encryption", "psk-mixed")
+    map.uci:save(config_name)
+    map.uci:commit(config_name)
 end
 
 function map.on_after_commit()

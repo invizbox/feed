@@ -57,7 +57,7 @@ def validate_features(features):
 
 @ADMIN_INTERFACE_APP.get('/ping')
 def ping():
-    """simple endpoint to ping API availibility - returns a 204 or 503 depending on API readiness"""
+    """simple endpoint to ping API availability - returns a 204 or 503 depending on API readiness"""
     if ADMIN_INTERFACE_APP.ping_ready:
         response.status = 204
     else:

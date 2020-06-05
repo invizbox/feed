@@ -349,7 +349,8 @@ def aggregate_loop(uci):
             PROFILES_APP.lists_rebuild_flag = False
             admin_uci = uci.get_package(ADMIN_PKG)
             for network in admin_uci:
-                if network[".type"] == "network" and network["id"] != "lan_local" and network["profile_id"]:
+                if network[".type"] == "network" and network["id"] != "lan_local"\
+                        and "profile_id" in network and network["profile_id"]:
                     rebuild_site_blocking(uci, network["id"], get_profile(network["profile_id"]))
 
 

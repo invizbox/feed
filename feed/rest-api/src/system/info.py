@@ -24,6 +24,23 @@ INFO_APP.install(UCI_PLUGIN)
 INFO_APP.install(UCI_ROM_PLUGIN)
 
 
+def get_file_info(filename):
+    """helper function to get the value from a file"""
+    try:
+        with open(filename) as my_file:
+            return my_file.readline().rstrip()
+    except FileNotFoundError:
+        return ''
+
+
+def get_uci_info(uci, package, section, option):
+    """helper function to get the value from UCI """
+    try:
+        return uci.get_option(package, section, option) or "unknown"
+    except UciException:
+        return "unknown"
+
+
 @INFO_APP.get('/system/info/generic')
 @jwt_auth_required
 def get_generic_info(uci, uci_rom):
@@ -40,34 +57,24 @@ def get_generic_info(uci, uci_rom):
     try:
         ubus_process = run(["ubus", "call", "system", "board"], stdout=PIPE, stderr=PIPE, timeout=5, check=False)
         system_json = json_loads(ubus_process.stdout)
-        with open("/sys/devices/platform/soc/1c30000.ethernet/net/eth0/address") as addresses_file:
-            mac_address_ethernet = addresses_file.readline().rstrip()
-        with open("/sys/devices/platform/soc/1c1b000.usb/usb2/2-1/2-1:1.0/ieee80211/phy1/addresses") as addresses_file:
-            mac_address_24ghz = addresses_file.readline().rstrip()
-        with open("/sys/devices/platform/soc/1c10000.mmc/mmc_host/mmc1/mmc1:0001/mmc1:0001:1/ieee80211/phy0/addresses")\
-                as addresses_file:
-            mac_address_5ghz = addresses_file.readline().rstrip()
-        with open("/usr/lib/opkg/info/admin-interface.control") as admin_interface_file:
-            for line in admin_interface_file.readlines():
-                if line.startswith("Version:"):
-                    admin_interface_version = line.strip().split()[1].replace('-', '.')
-                    break
+        mac_address_ethernet = get_file_info("/sys/devices/platform/soc/1c30000.ethernet/net/eth0/address")
+        mac_address_24ghz = get_file_info("/sys/devices/platform/soc"
+                                          "/1c1b000.usb/usb2/2-1/2-1:1.0/ieee80211/phy1/addresses")
+        mac_address_5ghz = get_file_info("/sys/devices/platform/soc"
+                                         "/1c10000.mmc/mmc_host/mmc1/mmc1:0001/mmc1:0001:1/ieee80211/phy0/addresses")
         try:
-            firmware_version = uci.get_option(UPDATE_PKG, "version", "firmware") or "unknown"
-        except UciException:
-            firmware_version = "unknown"
-        try:
-            rom_firmware_version = uci_rom.get_option(UPDATE_PKG, "version", "firmware") or "unknown"
-        except UciException:
-            rom_firmware_version = "unknown"
-        try:
-            new_firmware_version = uci.get_option(UPDATE_PKG, "version", "new_firmware") or "unknown"
-        except UciException:
-            new_firmware_version = "unknown"
-        try:
-            api_version = uci.get_option(REST_API_PKG, "version", "api") or "unknown"
-        except UciException:
-            api_version = "unknown"
+            admin_interface_version = ''
+            with open("/usr/lib/opkg/info/admin-interface.control") as admin_interface_file:
+                for line in admin_interface_file.readlines():
+                    if line.startswith("Version:"):
+                        admin_interface_version = line.strip().split()[1].replace('-', '.')
+                        break
+        except FileNotFoundError:
+            pass
+        firmware_version = get_uci_info(uci, UPDATE_PKG, "version", "firmware")
+        rom_firmware_version = get_uci_info(uci_rom, UPDATE_PKG, "version", "firmware")
+        new_firmware_version = get_uci_info(uci, UPDATE_PKG, "version", "new_firmware")
+        api_version = get_uci_info(uci, REST_API_PKG, "version", "api")
         return {"info": {"currentFirmware": firmware_version,
                          "resetFirmware": rom_firmware_version,
                          "newFirmware": new_firmware_version,

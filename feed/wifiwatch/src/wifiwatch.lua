@@ -10,8 +10,7 @@ local signal = require("posix.signal")
 
 local wifiwatch = {}
 wifiwatch.running = true
-wifiwatch.station = "wan"
-wifiwatch.sta_interface = uci:get("network", "wan", "ifname") or uci:get("wireless", "wan", "ifname")
+wifiwatch.wan_interface = "eth0.2"
 wifiwatch.wan_up_ds = 30
 wifiwatch.failed_networks = {}
 
@@ -38,14 +37,14 @@ end
 function wifiwatch.restart_wan()
     os.execute("wifi down")
     for _=1, 5 do
-        if os.execute("ip -f inet -o addr show "..wifiwatch.sta_interface.." 2>/dev/null | grep [i]net") ~=0 then
+        if os.execute("ip -f inet -o addr show "..wifiwatch.wan_interface.." 2>/dev/null | grep [i]net") ~=0 then
             break
         end
         utils.sleep(1)
     end
     os.execute("wifi up")
     for _=1, wifiwatch.wan_up_ds do
-        if os.execute("ip -f inet -o addr show "..wifiwatch.sta_interface.." 2>/dev/null | grep inet") ==0 then
+        if os.execute("ip -f inet -o addr show "..wifiwatch.wan_interface.." 2>/dev/null | grep inet") ==0 then
             return true
         end
         utils.sleep(1)
@@ -70,13 +69,11 @@ function wifiwatch.connect_to_wifi(ssid, encryption, key)
 end
 
 function wifiwatch.deal_with_station()
-    local r_val = os.execute(". /lib/functions/network.sh && network_flush_cache && network_is_up "..wifiwatch.station)
-    local wan_up = r_val == 0
-    if wan_up then
-        utils.log(wifiwatch.station.." interface is up.")
+    if os.execute("ip route | grep '^default' > /dev/null") == 0 then
+        utils.log(wifiwatch.wan_interface.." interface is up.")
         return 10
     else
-        utils.log(wifiwatch.station.." interface is not up.")
+        utils.log(wifiwatch.wan_interface.." interface is not up.")
         local seconds_since_last_ui_move = wifiwatch.last_access_to_ui()
         local config_name = "known_networks"
         uci:load(config_name)
@@ -115,7 +112,7 @@ function wifiwatch.deal_with_station()
             config_name = "wireless"
             uci:load(config_name)
             if uci:get(config_name, "wan", "disabled") ~= "1" then
-                utils.log("disabling "..wifiwatch.station.." in /etc/config/wireless as no usable network found.")
+                utils.log("disabling "..wifiwatch.wan_interface.." in /etc/config/wireless as no usable network found.")
                 uci:set(config_name, "wan", "disabled", "1")
                 uci:commit(config_name)
                 os.execute("wifi up")
@@ -132,7 +129,7 @@ function wifiwatch.main()
 
     -- wait to give a chance to the existing entry to (re)connect
     for _=1, wifiwatch.wan_up_ds do
-        if os.execute("ip -f inet -o addr show "..wifiwatch.sta_interface.." 2>/dev/null | grep inet") ==0 then
+        if os.execute("ip -f inet -o addr show "..wifiwatch.wan_interface.." 2>/dev/null | grep inet") ==0 then
             break
         end
         utils.sleep(1)

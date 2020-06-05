@@ -2,23 +2,19 @@
 -- https://www.invizbox.com/lic/license.txt
 
 local cbi = require "luci.cbi"
-local uci = require "uci".cursor()
 local translate = require "luci.i18n"
 local sys = require "luci.sys"
 
-----------------------------
---  MAP SECTION TO CONFIG FILE
-------------------------------
-
 local map = cbi.Map("vpn",translate.translate("Privacy Mode"))
 map.anonymous = true
+map:chain("wizard")
+map:chain("tor")
+map:chain("openvpn")
 
-local mode_details = map:section(cbi.TypedSection, "active", "", translate.translate("Select your privacy mode:"))
+local mode_details = map:section(cbi.NamedSection, "active", "active", "",
+        translate.translate("Select your privacy mode:"))
 mode_details.addremove = false
 mode_details.anonymous = true
-mode_details.isempty = true
-mode_details.loop = true
-mode_details.template = "cbi/tsection"
 
 local mode = mode_details:option(cbi.ListValue, "mode", translate.translate("Choose Privacy Mode").." :" )
 mode.id = "mode"
@@ -30,27 +26,24 @@ mode:value("extend", "Wifi Extender")
 
 function map.on_after_commit(self)
     local selected_mode = self:formvalue("cbid.vpn.active.mode")
-    uci:load("wizard")
-    local product_name = uci:get("wizard", "main", "product_name") or "InvizBox Go"
+    local product_name = map.uci:get("wizard", "main", "product_name") or "InvizBox Go"
     if product_name == "InvizBox" then
-        uci:load("tor")
         if selected_mode == "vpn" then
-            uci:set("tor", "tor", "enabled", "0")
+            map.uci:set("tor", "tor", "enabled", "0")
         else
-            uci:set("tor", "tor", "enabled", "1")
+            map.uci:set("tor", "tor", "enabled", "1")
         end
-        uci:save("tor")
-        uci:commit("tor")
+        map.uci:save("tor")
+        map.uci:commit("tor")
         sys.call("/etc/init.d/tor restart")
     end
-    uci:load("openvpn")
     if selected_mode == "tor" or selected_mode == "extend" then
-        uci:set("openvpn", "vpn", "enabled", "0")
+        map.uci:set("openvpn", "vpn_0", "enabled", "0")
     else
-        uci:set("openvpn", "vpn", "enabled", "1")
+        map.uci:set("openvpn", "vpn_0", "enabled", "1")
     end
-    uci:save("openvpn")
-    uci:commit("openvpn")
+    map.uci:save("openvpn")
+    map.uci:commit("openvpn")
     sys.call("/etc/init.d/openvpn restart")
 end
 

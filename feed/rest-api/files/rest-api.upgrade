@@ -1,2 +1,3 @@
 /etc/dns_blacklist/
+/etc/jwt_secret
 /etc/profiles.json

@@ -14,9 +14,11 @@ function expert.index()
     if show_choose_network then
         entry({"admin", "invizbox", "choose_network"}, cbi("choose_network", {wizard_show_prev=true}),
             _("Choose Network"), 2).leaf = true
+        entry({"admin", "invizbox", "captive_portal"}, cbi("captive_portal"), _("Captive Portal"), 8).leaf = true
     end
     entry({"admin", "invizbox", "privacy_mode"}, cbi("privacy_mode"), _("Privacy Mode"), 3).leaf = true
     entry({"admin", "invizbox", "hotspot"}, cbi("hotspot"), _("Hotspot"), 4).leaf = true
+    entry({"admin", "invizbox", "dns"}, cbi("dns"), _("DNS"), 4).leaf = true
     entry({"admin", "invizbox", "account_details"}, cbi("account_details"), _("Account Details"), 5).leaf = true
     entry({"admin", "invizbox", "tor_configuration"}, cbi("tor_configuration"), _("Tor Configuration"), 6).leaf = true
     entry({"admin", "invizbox", "tor_advanced"}, cbi("tor_advanced"), _("Tor Advanced"), 7).leaf = true

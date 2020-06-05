@@ -677,6 +677,7 @@ EOT
         uci add_list dhcp.lan_clear2.dhcp_option="option:domain-search,vpn1,loc,vpn2,clear1,tor,vpn3,vpn4"
         uci add_list dhcp.lan_local.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.7.1"
         uci add_list dhcp.lan_local.dhcp_option="option:domain-search,vpn1,vpn2,clear1,tor,clear2,vpn3,vpn4"
+        uci commit dhcp
     fi
 fi
 
@@ -745,4 +746,5 @@ if [ $(version ${pre_update_version}) -lt $(version 0.1.0) ]; then
     uci set firewall.local_to_all.proto=all
     uci set firewall.local_to_all.target=ACCEPT
     uci reorder firewall.local_to_all=18
+    uci commit firewall
 fi

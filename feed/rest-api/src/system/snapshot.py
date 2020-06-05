@@ -55,6 +55,8 @@ def get_snapshot():
         run(["ps"], stdout=out_file, stderr=STDOUT, check=False)
     with open("/tmp/snapshot/logread.txt", "w") as out_file:
         run(["logread"], stdout=out_file, stderr=STDOUT, check=False)
+    with open("/tmp/snapshot/dmesg.txt", "w") as out_file:
+        run(["dmesg"], stdout=out_file, stderr=STDOUT, check=False)
     with open("/tmp/snapshot/ifconfig.txt", "w") as out_file:
         run(["ifconfig"], stdout=out_file, stderr=STDOUT, check=False)
     with open("/tmp/snapshot/iptables-save.txt", "w") as out_file:

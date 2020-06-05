@@ -19,14 +19,17 @@ class IB2Backend(BaseAuthBackend):
     def authenticate_user(self, username, password):
         """authenticate user by name and password"""
         users_uci = self.uci.get_package(REST_API_PKG)
-        try:
-            user = next({'id': int(user["id"]),
-                         'username': user["name"],
-                         'password': user["password"]} for user in users_uci
-                        if user[".type"] == "user" and user["name"] == username and user["password"] == password)
-        except StopIteration:
-            return None
-        return user
+        return_user = None
+        for user in users_uci:
+            if "password" not in user:
+                user["password"] = ""
+            if user[".type"] == "user" and user["name"] == username and user["password"] == password:
+                return_user = {
+                    'id': int(user["id"]),
+                    'username': user["name"],
+                    'password': user["password"]
+                }
+        return return_user
 
     def get_user(self, user_id):
         """retrieve user by id"""

@@ -54,6 +54,7 @@ end
 function netwatch2.deal_with_connectivity()
     if os.execute("ip route | grep '^default' > /dev/null") == 0 then
         if netwatch2.wan_up == nil or not netwatch2.wan_up then
+            netwatch2.wan_up = true
             utils.log(netwatch2.wan_interface.." interface is connected.")
             -- Get Initial VPN server if needed
             if (not netwatch2.city_1 and not netwatch2.city_2 and not netwatch2.city_3) then
@@ -65,23 +66,31 @@ function netwatch2.deal_with_connectivity()
             os.execute("/etc/init.d/sysntpd restart")
             -- DNS
             netwatch2.set_dnsmasq_uci_captive(false)
-            netwatch2.wan_up = true
         end
         uci:load("vpn")
         uci:load("update")
         if uci:get("vpn", "active", "username") ~= nil and uci:get("update", "active", "current_vpn_sha") == "123456"
                 and utils.tor_is_up() then
             utils.log("Running update to get the initial set of VPN configurations")
-            update.update() -- initial update
+            if os.execute("lock -n /var/lock/update.lock") == 0 then
+                pcall(update.load_update_config)
+                local success, return_value = pcall(update.update_vpn)
+                if success and return_value == true then
+                    os.execute("kill -USR1 $(ps | grep [r]est_api | awk '{print $1}') 2>/dev/null")
+                else
+                    utils.log("Error updating VPN locations")
+                end
+                os.execute("lock -u /var/lock/update.lock")
+            end
         end
     else
         if netwatch2.wan_up == nil or netwatch2.wan_up then
+            netwatch2.wan_up = false
             utils.log(netwatch2.wan_interface.." interface is not connected.")
             -- LED
             led._globe_off()
             -- DNS
             netwatch2.set_dnsmasq_uci_captive(true)
-            netwatch2.wan_up = false
         end
     end
 end

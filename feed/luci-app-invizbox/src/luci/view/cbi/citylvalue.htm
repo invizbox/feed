@@ -9,6 +9,7 @@
 		<option<%=
 			attr("id", self.id.."-"..key) ..
 			attr("filtercountry", self.countries[value]) ..
+			attr("protocols", self.protocols[value]) ..
 			attr("value", key) ..
 			attr("data-index", i) ..
 			attr("data-depends", self:deplist2json(section, self.deplist[i]))
