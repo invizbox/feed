@@ -80,15 +80,16 @@ function wifiwatch.deal_with_station()
         local connected = false
         if seconds_since_last_ui_move >= 180 then
             if uci:foreach(config_name, "network", function(network)
-                return wifiwatch.failed_networks[network.ssid]
+                return wifiwatch.failed_networks[network.ssid] and wifiwatch.failed_networks[network.ssid] < 3
             end) then
                 utils.log("Trying to connect to known servers")
                 local index, networks = utils.wifi_networks()
                 for _, ssid in ipairs(index) do
                     local uci_ssid = utils.uci_characters(ssid)
+                    local failed_to_connect = wifiwatch.failed_networks[ssid] and wifiwatch.failed_networks[ssid] >= 3
                     if uci:get(config_name, uci_ssid) == "network"
                             and uci:get(config_name, uci_ssid, "ssid") == ssid
-                            and wifiwatch.failed_networks[ssid] ~= true then
+                            and not failed_to_connect then
                         local encryption = networks[ssid].encryption
                         local key = uci:get(config_name, uci_ssid, "key")
                         if wifiwatch.connect_to_wifi(ssid, encryption, key) then
@@ -98,9 +99,12 @@ function wifiwatch.deal_with_station()
                             os.execute("/etc/init.d/openvpn restart")
                             break
                         else
-                            utils.log("unable to connect to "..ssid
-                                    ..", forgetting this SSID until next successful connection")
-                            wifiwatch.failed_networks[ssid] = true
+                            utils.log("unable to connect to SSID ["..ssid.."], removing one attempt to connect from 3")
+                            if wifiwatch.failed_networks[ssid] == nil then
+                                wifiwatch.failed_networks[ssid] = 1
+                            else
+                                wifiwatch.failed_networks[ssid] = wifiwatch.failed_networks[ssid] + 1
+                            end
                         end
                     end
                 end

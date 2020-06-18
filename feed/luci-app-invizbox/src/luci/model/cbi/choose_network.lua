@@ -7,14 +7,11 @@ local translate = require "luci.i18n"
 local dispatcher = require "luci.dispatcher"
 local utils = require("invizboxutils")
 
-local map, station, ssid, encryption, key, hidden_network, dummy_value
+local map, station, ssid, encryption, key, hidden_network, dummy_value, wizard_prev_page, wizard_final_page
 
 map = cbi.Map("wireless", translate.translate("Choose Network"))
 map.anonymous = true
 map:chain("wizard")
-if map.uci:get("wizard", "main", "complete") == "false" then
-    map.redirect = dispatcher.build_url("wizard/complete")
-end
 
 station = map:section(cbi.NamedSection, "wan", "wifi-iface", "",
     translate.translate("Select the WiFi hotspot to connect to:"))
@@ -42,6 +39,19 @@ dummy_value = station:option(cbi.DummyValue, "currentssid")
 dummy_value.template = "cbi/hiddeninput"
 dummy_value.id = "currentssid"
 dummy_value.value = map:get("wan", "ssid")
+
+if map.uci:get("wizard", "main", "complete") == "false" then
+    map.redirect = dispatcher.build_url("wizard/complete")
+
+    wizard_prev_page = station:option(cbi.DummyValue, "wizard_prev_page")
+    wizard_prev_page.template = "cbi/hiddeninput"
+    wizard_prev_page.id = "wizard_prev_page"
+    wizard_prev_page.value = dispatcher.build_url("basic", "invizbox", "account_details")
+
+    wizard_final_page = station:option(cbi.DummyValue, "wizard_final_page")
+    wizard_final_page.template = "cbi/hiddeninput"
+    wizard_final_page.id = "wizard_final_page"
+end
 
 function map.on_before_save(self)
     self:del("wan", "disabled")

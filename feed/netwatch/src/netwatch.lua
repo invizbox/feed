@@ -11,13 +11,12 @@ local defaultpassword = require("defaultpassword")
 local signal = require("posix.signal")
 
 local netwatch = {}
-netwatch.running = true
-netwatch.wan_up = nil
+netwatch.captive = nil
 netwatch.mode = nil
+netwatch.mode_changed = false
+netwatch.running = true
 netwatch.secure = nil
-netwatch.wan_interface = "eth0.2"
-netwatch.vpn = "tun0"
-netwatch.tor = "eth0.3"
+netwatch.wan_up = nil
 
 -- here for unit testing the main function by overwriting this function
 function netwatch.keep_running()
@@ -72,11 +71,13 @@ function netwatch.reset_iptables(firewall_script)
     os.execute("/etc/init.d/firewall reload")
 end
 
-function netwatch.status_and_clear_captive(status, clear_captive)
-    netwatch.captive = false
+function netwatch.status_and_set_captive(status, captive)
     uci:load("wizard")
-    if clear_captive then
+    if captive then
+        netwatch.captive = true
+    else
         uci:set("wizard", "main", "manual_captive_mode", "0")
+        netwatch.captive = false
     end
     uci:set("wizard", "main", "status", status)
     uci:save("wizard")
@@ -98,7 +99,7 @@ function netwatch.deal_with_connectivity()
     if os.execute("ip route | grep '^default' > /dev/null") == 0 then
         if netwatch.wan_up == nil or not netwatch.wan_up then
             netwatch.wan_up = true
-            utils.log(netwatch.wan_interface.." interface is connected.")
+            utils.log("WAN interface is connected.")
             -- first check for a big time discrepancy over http (enough to enable login for openvpn - main issue)
             os.execute("htpdate -s en.wikipedia.org www.apache.org www.duckduckgo.com www.mozilla.org")
             -- then rely on ntp (if network allows - otherwise above will have to suffice)
@@ -112,13 +113,13 @@ function netwatch.deal_with_connectivity()
     end
     if netwatch.wan_up == nil or netwatch.wan_up then
         netwatch.wan_up = false
-        utils.log(netwatch.wan_interface.." interface is not up - going captive until this changes.")
+        utils.log("WAN interface is not up - going captive until this changes.")
         led.not_connected()
         netwatch.set_dnsmasq_uci("captive")
         netwatch.reset_iptables("firewall.no_network")
         netwatch.mode = "not connected"
         netwatch.secure = false
-        netwatch.status_and_clear_captive("No Internet Connection", true)
+        netwatch.status_and_set_captive("No Internet Connection", false)
     end
     return false
 end
@@ -126,40 +127,40 @@ end
 function netwatch.deal_with_state()
     uci:load("vpn")
     local mode = uci:get("vpn", "active", "mode") or "none"
-    local mode_changed = false
+    netwatch.mode_changed = false
     if netwatch.mode == nil or netwatch.mode ~= mode then
         netwatch.mode = mode
-        mode_changed = true
+        netwatch.mode_changed = true
     end
     if mode == "extend" then
-        if mode_changed then
+        if netwatch.mode_changed then
             utils.log("Wifi extender mode - using extend configuration.")
             led.clear()
             netwatch.set_dnsmasq_uci("auto")
             netwatch.reset_iptables("firewall.extend")
             netwatch.secure = false
-            netwatch.status_and_clear_captive("Wifi Extender Mode (no VPN or Tor)", true)
+            netwatch.status_and_set_captive("Wifi Extender Mode (no VPN or Tor)", false)
         end
         return true
     elseif mode == "vpn" and os.execute("grep -r up /tmp/openvpn/ >/dev/null 2>&1") == 0 then
-        if mode_changed or netwatch.secure == nil or not netwatch.secure then
-            utils.log("VPN mode - "..netwatch.vpn.." interface is up - using VPN configuration.")
+        if netwatch.mode_changed or netwatch.secure == nil or not netwatch.secure then
+            utils.log("VPN mode - tun0 interface is up - using VPN configuration.")
             led.secure()
             netwatch.set_dnsmasq_uci("vpn0")
             netwatch.reset_iptables("firewall.vpn")
             netwatch.save_credentials()
             netwatch.secure = true
-            netwatch.status_and_clear_captive("Secure Connection - VPN Active", true)
+            netwatch.status_and_set_captive("Secure Connection - VPN Active", false)
         end
         return true
     elseif mode == "tor" and utils.tor_is_up() then
-        if mode_changed or netwatch.secure == nil or not netwatch.secure then
+        if netwatch.mode_changed or netwatch.secure == nil or not netwatch.secure then
             utils.log("Tor mode - tor is up - using Tor configuration.")
             led.secure()
             netwatch.set_dnsmasq_uci("tor")
             netwatch.reset_iptables("firewall.tor")
             netwatch.secure = true
-            netwatch.status_and_clear_captive("Secure Connection - Tor Active", true)
+            netwatch.status_and_set_captive("Secure Connection - Tor Active", false)
         end
         return true
     end
@@ -175,11 +176,11 @@ function netwatch.deal_with_captive_portal()
             netwatch.reset_iptables("firewall.captive")
             netwatch.mode = "captive"
             netwatch.secure = false
-            netwatch.status_and_clear_captive("Behind Captive Portal", false)
-            netwatch.captive = true
+            netwatch.status_and_set_captive("Behind Captive Portal", true)
         end
     else
-        if netwatch.captive == nil or netwatch.captive or netwatch.secure then
+        if netwatch.mode_changed or netwatch.captive == nil or netwatch.captive
+                or netwatch.secure == nil or netwatch.secure then
             uci:load("vpn")
             local mode = uci:get("vpn", "active", "mode") or "none"
             utils.log("Not behind captive portal.")
@@ -189,9 +190,9 @@ function netwatch.deal_with_captive_portal()
             netwatch.mode = "not captive"
             netwatch.secure = false
             if mode == "vpn" then
-                netwatch.status_and_clear_captive("No VPN Connection", true)
+                netwatch.status_and_set_captive("No VPN Connection", false)
             elseif mode == "tor" then
-                netwatch.status_and_clear_captive("No Tor Connection", true)
+                netwatch.status_and_set_captive("No Tor Connection", false)
             end
         end
     end

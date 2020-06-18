@@ -1,0 +1,77 @@
+#!/bin/ash
+
+# Copyright 2020 InvizBox Ltd
+#
+# Licensed under the InvizBox Shared License;
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#        https://www.invizbox.com/lic/license.txt
+
+. /lib/functions.sh
+function version { printf "%03d%03d%03d" $(echo "$1" | tr '.' ' '); }
+function replace_first { sed -i -e "1s/$1/$2/;t" -e "1,/$1/s//$2/" $3; }
+
+pre_update_version=$(uci get update.version.firmware)
+
+if [ $(version ${pre_update_version}) -lt $(version 4.0.13) ]; then
+    # firewall
+    uci set firewall.user_include=include
+    uci set firewall.user_include.enabled=1
+    uci set firewall.user_include.path=/bin/firewall.no_network
+    uci set firewall.user_include.reload=1
+    uci commit firewall
+
+    # network
+    uci del network.globals
+    uci rename network.vpn=vpn_0
+    uci set network.local_vpn_traffic=route
+    uci set network.local_vpn_traffic.interface=lan
+    uci set network.local_vpn_traffic.target=10.153.146.0
+    uci set network.local_vpn_traffic.netmask=255.255.255.0
+    uci set network.local_vpn_traffic.gateway=0.0.0.0
+    uci set network.local_vpn_traffic.table=1
+    uci commit network
+
+    # openvpn
+    uci rename openvpn.vpn=vpn_0
+    uci set openvpn.vpn_0.config=/etc/openvpn/openvpn_0.conf
+    mv /etc/openvpn/openvpn.conf /etc/openvpn/openvpn_0.conf
+    uci commit openvpn
+    sed -i "s/auth-nocache/auth-nocache\nscript-security 2\nroute-noexec\nroute-up \/bin\/route_up.ash\nroute-pre-down \/bin\/route_pre_down.ash/g" /etc/openvpn/openvpn_0.conf
+    sed -i "s/auth-nocache/auth-nocache\nscript-security 2\nroute-noexec\nroute-up \/bin\/route_up.ash\nroute-pre-down \/bin\/route_pre_down.ash/g" /etc/openvpn/templates/*
+
+    # dhcp
+    uci set dhcp.invizbox.leasefile=/tmp/dhcp.leases
+    uci rename dhcp.vpn=vpn0
+    uci del dhcp.vpn0.rebind_domain
+    uci add_list dhcp.tor.server=/onion/172.31.1.1#9053
+    uci set dhcp.lan.disabled=0
+    uci set dhcp.lan.force=1
+    uci set dhcp.lan.instance=auto
+    uci commit dhcp
+
+    # wizard
+    uci set wizard.main.dns_id=dhcp
+    uci set wizard.main.manual_captive_mode=0
+    uci set wizard.main.status="Default State"
+    uci commit wizard
+
+    # vpn
+    first_template=$(grep -m1 "option template" /etc/config/vpn | awk '{print $3}' | cut -d "'" -f 2)
+    sed -i "s/\toption template/\tlist protocol_id 'openvpn_tcp_443'\n\toption template/g" /etc/config/vpn
+    sed -ie "/option template/d" /etc/config/vpn
+    uci set vpn.active.protocol_id=openvpn_tcp_443
+    uci rename vpn.active.vpn=vpn_0
+    uci set vpn.openvpn_tcp_443=protocol
+    for server in $(uci get dhcp.vpn0.server)
+    do
+        case "$server" in
+            *@tun0) uci add_list vpn.openvpn_tcp_443.dns_server="${server::-5}" ;;
+        esac
+    done
+    uci set vpn.openvpn_tcp_443.name="OpenVPN over TCP port 443"
+    uci set vpn.openvpn_tcp_443.template="$first_template"
+    uci set vpn.openvpn_tcp_443.vpn_protocol=OpenVPN
+    uci commit vpn
+fi

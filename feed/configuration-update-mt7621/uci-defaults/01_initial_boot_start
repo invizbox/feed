@@ -1,0 +1,4 @@
+#!/bin/ash
+
+. /bin/ledcontrol.ash
+led_wifi_green_quick_flashing

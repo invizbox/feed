@@ -352,3 +352,26 @@ if (document.getElementById('cbid.wizard.main.manual_captive_mode')) {
   }
 }
 
+if (document.getElementById('wizard_prev_page')) {
+  var uciChanges = document.querySelector('.uci_change_indicator.label.notice');
+  if (uciChanges) {
+    uciChanges.style.display = "none";
+  }
+  var buttonsSection = document.querySelector('.cbi-page-actions');
+  var previousButton = document.createElement('input');
+  previousButton.setAttribute('id', 'Previous');
+  previousButton.setAttribute('value', 'Previous');
+  previousButton.setAttribute('type', 'button');
+  previousButton.setAttribute('class', 'cbi-button');
+  previousButton.setAttribute('onclick', 'location.href=document.getElementById(\'wizard_prev_page\').value');
+  buttonsSection.prepend(previousButton);
+  var applyButton = document.querySelector('.cbi-button.cbi-button-apply');
+  if (document.getElementById('wizard_final_page')) {
+    applyButton.id = "Finish";
+    applyButton.value = "Finish";
+  } else {
+    applyButton.id = "Next";
+    applyButton.value = "Next";
+    applyButton.setAttribute('onclick', 'cbi_submit(this)');
+  }
+}

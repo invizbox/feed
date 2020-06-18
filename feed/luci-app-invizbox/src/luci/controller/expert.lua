@@ -12,8 +12,7 @@ function expert.index()
     entry({"admin", "invizbox"}, alias("admin", "invizbox", "hotspot"), _(product_name), 23).index = true
     entry({"admin", "invizbox", "vpn_location"}, cbi("vpn_location"), _("VPN Location"), 1).leaf = true
     if show_choose_network then
-        entry({"admin", "invizbox", "choose_network"}, cbi("choose_network", {wizard_show_prev=true}),
-            _("Choose Network"), 2).leaf = true
+        entry({"admin", "invizbox", "choose_network"}, cbi("choose_network"), _("Choose Network"), 2).leaf = true
         entry({"admin", "invizbox", "captive_portal"}, cbi("captive_portal"), _("Captive Portal"), 8).leaf = true
     end
     entry({"admin", "invizbox", "privacy_mode"}, cbi("privacy_mode"), _("Privacy Mode"), 3).leaf = true

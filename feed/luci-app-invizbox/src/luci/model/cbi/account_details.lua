@@ -5,14 +5,15 @@ local cbi = require "luci.cbi"
 local translate = require "luci.i18n"
 local dispatcher = require "luci.dispatcher"
 local fs = require "nixio.fs"
+local http = require "luci.http"
 local sys = require "luci.sys"
-local map, account, vpnaccount, password
+local map, account, vpnaccount, password, wizard_prev_page
 
 map = cbi.Map("vpn", translate.translate("Account Details"))
 map.anonymous = true
 map:chain("wizard")
 if map.uci:get("wizard", "main", "complete") == "false" then
-    map.redirect = dispatcher.build_url("wizard/complete")
+    map.redirect = dispatcher.build_url("basic", "invizbox", "choose_network")
 end
 
 local enter_string = "Enter your InvizBox VPN account details below"
@@ -31,6 +32,17 @@ password.required = true
 password.template = "cbi/value"
 password.password = true
 password.maxlength = 63
+
+if map.uci:get("wizard", "main", "complete") == "false" then
+    wizard_prev_page = account:option(cbi.DummyValue, "wizard_prev_page")
+    wizard_prev_page.template = "cbi/hiddeninput"
+    wizard_prev_page.id = "wizard_prev_page"
+    wizard_prev_page.value = dispatcher.build_url("wizard", "wizard")
+
+    function map.on_after_save()
+        http.redirect(dispatcher.build_url("basic", "invizbox", "choose_network"))
+    end
+end
 
 function map.on_after_commit(self)
     fs.writefile("/etc/openvpn/login.auth", self:formvalue("cbid.vpn.active.username").."\n"..

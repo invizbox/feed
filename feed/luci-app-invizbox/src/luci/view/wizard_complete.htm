@@ -4,6 +4,7 @@
 
 <%
     local uci = require("uci").cursor()
+    local fs = require "nixio.fs"
 %>
 
 <%+header%>
@@ -26,7 +27,14 @@
 <%+footer%>
 
 <%
-    local config_name = "wizard"
+    local config_name = "vpn"
+    uci:load(config_name)
+    local username = uci:get(config_name, "active", "username") or ""
+    local password = uci:get(config_name, "active", "password") or ""
+    fs.writefile("/etc/openvpn/login.auth", username.."\n"..password)
+    os.execute("/etc/init.d/openvpn restart")
+
+    config_name = "wizard"
     uci:load(config_name)
     uci:set(config_name, "main", "complete", "true")
     os.execute("/etc/init.d/netwatch restart")

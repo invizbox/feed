@@ -31,8 +31,7 @@ function basic.index()
     entry({"basic", "invizbox"}, alias("basic", "invizbox", "vpn_location"), _(product_name), 23).index = true
     entry({"basic", "invizbox", "vpn_location"}, cbi("vpn_location"), _("VPN Location"), 1).leaf = true
     if show_choose_network then
-        entry({"basic", "invizbox", "choose_network"}, cbi("choose_network", {wizard_show_prev=true}),
-            _("Choose Network"), 2).leaf = true
+        entry({"basic", "invizbox", "choose_network"}, cbi("choose_network"),  _("Choose Network"), 2).leaf = true
     end
     entry({"basic", "invizbox", "privacy_mode"}, cbi("privacy_mode"), _("Privacy Mode"), 3).leaf = true
     entry({"basic", "invizbox", "hotspot"}, cbi("hotspot"), _("Hotspot"), 4).leaf = true
