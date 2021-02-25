@@ -11,6 +11,7 @@ from plugins.plugin_jwt import JWT_PLUGIN
 from plugins.plugin_uci import UCI_PLUGIN
 from plugins.uci import UciException
 from utils.validate import validate_option
+import system.vpn as vpn
 
 
 ADMIN_PKG = "admin-interface"
@@ -98,6 +99,7 @@ def set_ftux(uci):
 def get_features(uci):
     """gets a list of features for the Administration Interface"""
     try:
+        plans = vpn.get_plans(uci)
         try:
             openvpn_credentials_text = uci.get_option(ADMIN_PKG, "features", "openvpn_credentials_text")
         except UciException:
@@ -138,6 +140,7 @@ def get_features(uci):
             'onboarding': {
                 "ipsecCredentials": ipsec_credentials_needed,
                 "needed": onboarding_nedeed,
+                "plans": plans,
                 "vpnCredentials": vpn_credentials_needed
             },
             "support": {

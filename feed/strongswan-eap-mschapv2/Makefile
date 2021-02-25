@@ -4,10 +4,15 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=strongswan-eap-mschapv2
 PKG_VERSION:=0.0
-PKG_RELEASE:=1
+PKG_RELEASE:=4
 
 LE_CERT_FILENAME:=lets-encrypt-x3-cross-signed.pem
 LE_CERT_URL:=https://letsencrypt.org/certs/
+PROTONVPN_FILENAME:=ProtonVPN_ike_root.der
+PROTONVPN_URL:=https://protonvpn.com/download/
+SURFSHARK_URL_NAME:=ikev2
+SURFSHARK_URL:=https://my.surfshark.com/vpn/api/v1/server/configurations/
+SURFSHARK_FILENAME:=surfshark_ikev2.crt
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -17,7 +22,22 @@ define Download/letsencrypt-cert
 	HASH:=skip
 endef
 
+define Download/protonvpn-cert
+	FILE:=$(PROTONVPN_FILENAME)
+	URL:=$(PROTONVPN_URL)
+	HASH:=skip
+endef
+
+define Download/surfshark-cert
+	FILE:=$(SURFSHARK_FILENAME)
+	URL:=$(SURFSHARK_URL)
+	URL_FILE:=$(SURFSHARK_URL_NAME)
+	HASH:=skip
+endef
+
 $(eval $(call Download,letsencrypt-cert))
+$(eval $(call Download,protonvpn-cert))
+$(eval $(call Download,surfshark-cert))
 
 define Package/$(PKG_NAME)
 	SECTION:=invizbox
@@ -51,7 +71,7 @@ endef
 
 define Package/$(PKG_NAME)/description
 	This package provides Strongswan with the necessary packages for IPSec for IKEv2 with EAP-MSCHAPv2 as well as the
-	Let's Encrypt CA cert
+	Let's Encrypt CA cert and the ProtonVPN ike root cert
 endef
 
 define Build/Compile
@@ -62,6 +82,8 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/etc/ipsec.d
 	$(LN) /etc/ssl/certs $(1)/etc/ipsec.d/cacerts
 	$(INSTALL_DATA) $(DL_DIR)/$(LE_CERT_FILENAME) $(1)/etc/ssl/certs
+	$(INSTALL_DATA) $(DL_DIR)/$(PROTONVPN_FILENAME) $(1)/etc/ssl/certs
+	$(INSTALL_DATA) $(DL_DIR)/$(SURFSHARK_FILENAME) $(1)/etc/ssl/certs
 endef
 
 $(eval $(call BuildPackage,$(PKG_NAME)))

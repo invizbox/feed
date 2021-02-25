@@ -109,14 +109,23 @@ function netwatch2.save_credentials()
             local net_up = utils.get_first_line("/tmp/openvpn/"..network_id.."/status") == "up"
             if openvpn_net and net_up and not save_openvpn then
                 save_openvpn = true
-                if os.execute("sed 'N;s/\\n/ /' /etc/openvpn/login.auth > /tmp/vpn_credentials.txt") == 0 then
+                local plan = uci:get("vpn", "active", "plan") or ""
+                local username = uci:get("vpn", "active", "username") or ""
+                os.execute("sed '2!d' /etc/openvpn/login.auth > /tmp/vpn_password.txt")
+                local password = utils.get_first_line("/tmp/vpn_password.txt")
+                if os.execute("echo '"..username.." "..password.." "..plan.."' > /tmp/vpn_credentials.txt") == 0 then
                     os.execute("! diff -q /tmp/vpn_credentials.txt /private/vpn_credentials.txt"..
                             "&& cp /tmp/vpn_credentials.txt /private/vpn_credentials.txt")
                 end
             elseif separate_ipsec_credentials and ikev2_net and net_up and not save_ipsec then
                 save_ipsec = true
+                uci:load("update")
                 uci:load("ipsec")
+                local provider = string.match(uci:get("update", "urls", "nearest_cities") or "", "([^/]*)$")
                 local ipsec_username = uci:get("ipsec", "vpn_"..network_id, "eap_identity")
+                if provider == "protonvpn" then
+                    ipsec_username = ipsec_username:gsub("%+pib$", "")
+                end
                 local ipsec_password = uci:get("ipsec", "vpn_"..network_id, "eap_password")
                 if ipsec_username and ipsec_password then
                     os.execute('echo "'..ipsec_username..' '..ipsec_password..'" > /tmp/ipsec_credentials.txt')

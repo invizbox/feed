@@ -5,7 +5,7 @@ include $(INCLUDE_DIR)/version.mk
 
 PKG_NAME:=admin-interface
 PKG_VERSION:=0.3
-PKG_RELEASE:=25
+PKG_RELEASE:=26
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 

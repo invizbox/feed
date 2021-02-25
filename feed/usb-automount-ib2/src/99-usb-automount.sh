@@ -31,9 +31,9 @@ write_vpn_credentials () {
     vpn_file="/export/${mntpnt}/vpn_credentials.txt"
     if [ -f "${vpn_file}" ]; then
         logger "Found a VPN credentials file"
-        read vpn_username vpn_password < "${vpn_file}"
-        echo -n "${vpn_username} ${vpn_password}"  > /private/vpn_credentials.txt
-        echo ${vpn_username} ${vpn_password} >> "/export/${mntpnt}/written_vpn_cred.txt"
+        read vpn_username vpn_password plan < "${vpn_file}"
+        echo -n "${vpn_username} ${vpn_password} ${plan}" > /private/vpn_credentials.txt
+        echo ${vpn_username} ${vpn_password} ${plan} >> "/export/${mntpnt}/written_vpn_cred.txt"
         sed -i '1d' "${vpn_file}"
         return 0
     fi
@@ -45,7 +45,7 @@ write_ipsec_credentials () {
     if [ -f "${ipsec_file}" ]; then
         logger "Found an IPSec credentials file"
         read ipsec_username ipsec_password < "${ipsec_file}"
-        echo -n "${ipsec_username} ${ipsec_password}"  > /private/ipsec_credentials.txt
+        echo -n "${ipsec_username} ${ipsec_password}" > /private/ipsec_credentials.txt
         echo ${ipsec_username} ${ipsec_password} >> "/export/${mntpnt}/written_ipsec_cred.txt"
         sed -i '1d' "${ipsec_file}"
         return 0

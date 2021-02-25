@@ -392,11 +392,15 @@ end
 function invizboxutils.nearest_usable_vpn_server_to_uci(json_content)
     local usable_servers = {}
     local config_name = "vpn"
+    local current_plan = uci:get(config_name, "active", "plan") or ""
     for servers in json_content:gmatch('servers":%s*%["?([^%]]*)') do
         local servers_list = invizboxutils.list_from_string(servers)
         for _, server_name in pairs(servers_list) do
             if uci:get(config_name, invizboxutils.uci_characters(server_name)) then
-                table.insert(usable_servers, invizboxutils.uci_characters(server_name))
+                local server_plan = uci:get(config_name, invizboxutils.uci_characters(server_name), "plan") or ""
+                if server_plan == current_plan then
+                    table.insert(usable_servers, invizboxutils.uci_characters(server_name))
+                end
             end
         end
         if next(usable_servers) ~= nil then

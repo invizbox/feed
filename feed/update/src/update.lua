@@ -23,7 +23,7 @@ function update.load_update_config()
     local config_name = "update"
     uci:load(config_name)
     uci:load("vpn")
-    update.config.provider = string.match(uci:get(config_name, "urls", "nearest_cities"), "([^/]*)$")
+    update.config.provider = string.match(uci:get(config_name, "urls", "nearest_cities") or "", "([^/]*)$")
     os.execute("sed '2!d' /etc/openvpn/login.auth > /tmp/vpn_password.txt")
     update.config.vpn_password = utils.get_first_line("/tmp/vpn_password.txt")
     update.config.vpn_username = uci:get("vpn", "active", "username") or ""
@@ -81,15 +81,18 @@ function update.get_current_locations()
     return pre_update_locations
 end
 
-function update.get_similar_locations(some_uci, location)
+function update.get_similar_locations(some_uci, location, current_plan)
     local same_country, same_location, all = {}, {}, {}
     some_uci:foreach("vpn", "server", function(section)
-        table.insert(all, section[".name"])
-        local country = update.country_table[section["country"]] or section["country"]
-        if location and country == location["country"] and section["city"] == location["city"] then
-            table.insert(same_location, section[".name"])
-        elseif location and section["country"] == location["country"] then
-            table.insert(same_country, section[".name"])
+        local section_plan = section["plan"] or ""
+        if section_plan == current_plan then
+            table.insert(all, section[".name"])
+            local country = update.country_table[section["country"]] or section["country"]
+            if location and country == location["country"] and section["city"] == location["city"] then
+                table.insert(same_location, section[".name"])
+            elseif location and section["country"] == location["country"] then
+                table.insert(same_country, section[".name"])
+            end
         end
     end)
     return same_location, same_country, all
@@ -100,6 +103,7 @@ function update.change_locations_if_obsolete(pre_update_locations)
     uci:load("admin-interface")
     local replaced = false
     local interfaces = utils.get_vpn_interfaces()
+    local current_plan = uci:get("vpn", "active", "plan") or ""
     for vpn_interface, _ in pairs(interfaces) do
         local current_location = uci:get("vpn", "active", vpn_interface)
                 or uci:get("vpn", "active", "name")
@@ -109,7 +113,7 @@ function update.change_locations_if_obsolete(pre_update_locations)
             local current_protocol_id = uci:get("admin-interface", network_name , "protocol_id")
                     or uci:get("vpn", "active", "protocol_id")
             local location = pre_update_locations[current_location]
-            local same_location, same_country, all = update.get_similar_locations(uci, location)
+            local same_location, same_country, all = update.get_similar_locations(uci, location, current_plan)
             local new_location
             if current_location == "NotInitialised" then
                 new_location =  all[math.random(#all)]

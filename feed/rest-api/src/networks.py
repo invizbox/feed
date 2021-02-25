@@ -10,9 +10,9 @@ from plugins.plugin_jwt import JWT_PLUGIN
 from plugins.plugin_uci import UCI_PLUGIN, UCI_ROM_PLUGIN
 from plugins.uci import UciException
 from utils.validate import validate_option
-from admin_interface import hold_ping
-from system.vpn import get_locations_protocols
+import admin_interface
 from system.dns import replace_dnsmasq_servers
+from system import vpn
 import profiles
 
 ADMIN_PKG = "admin-interface"
@@ -74,7 +74,7 @@ def validate_network(network, uci):
         if network["type"] == "vpn":
             new_location = network["vpn"]["location"]
             valid &= validate_option("string", new_location)
-            locations, protocols = get_locations_protocols(uci)
+            locations, protocols = vpn.get_locations_protocols(uci)
             if "protocolId" in network["vpn"]:
                 valid &= network["vpn"]["protocolId"] in protocols
             else:
@@ -325,8 +325,8 @@ def update_network_vpn_location(uci, network_id, updated_network):
     """ update the vpn part of a specific network """
     entry_name = f"vpn_{network_id[-1]}"
     tunnel_interface = f"@tun{network_id[-1]}"
-    for vpn in uci.get_package(VPN_PKG):
-        if vpn[".type"] == "active" and entry_name in vpn:
+    for vpn_uci in uci.get_package(VPN_PKG):
+        if vpn_uci[".type"] == "active" and entry_name in vpn_uci:
             new_server_id = updated_network["vpn"]["location"]
             try:
                 server_conf = uci.get_config(VPN_PKG, new_server_id)
@@ -439,7 +439,7 @@ def update_network_profile(uci, network_id, current_profile_id, new_profile_id):
 
 def restart_processes(restart_dnsmasq, restart_network, restart_vpn):
     """ helper function to restart processes """
-    with hold_ping():
+    with admin_interface.hold_ping():
         if restart_dnsmasq:
             run(["/etc/init.d/dnsmasq", "reload"], check=False)
         if restart_network:
