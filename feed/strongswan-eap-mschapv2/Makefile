@@ -3,8 +3,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=strongswan-eap-mschapv2
-PKG_VERSION:=0.0
-PKG_RELEASE:=4
+PKG_VERSION:=1.0
+PKG_RELEASE:=0
 
 LE_CERT_FILENAME:=lets-encrypt-x3-cross-signed.pem
 LE_CERT_URL:=https://letsencrypt.org/certs/
@@ -39,12 +39,16 @@ $(eval $(call Download,letsencrypt-cert))
 $(eval $(call Download,protonvpn-cert))
 $(eval $(call Download,surfshark-cert))
 
-define Package/$(PKG_NAME)
+define Package/strongswaneapmschapv2/Default
 	SECTION:=invizbox
 	CATEGORY:=InvizBox
 	DEPENDS:=+kmod-ipsec \
+		+kmod-crypto-sha256 \
+		+kmod-crypto-rng \
+		+kmod-crypto-wq \
 		+vti \
 		+kmod-ip-vti \
+		+strongswan \
 		+strongswan-minimal \
 		+strongswan-ipsec \
 		+strongswan-pki \
@@ -69,15 +73,25 @@ define Package/$(PKG_NAME)
 		TITLE:=IPSec for IKEv2 with EAP-MSCHAPv2 and the Let's Encrypt CA cert
 endef
 
-define Package/$(PKG_NAME)/description
+define Package/strongswaneapmschapv2/Default/description
 	This package provides Strongswan with the necessary packages for IPSec for IKEv2 with EAP-MSCHAPv2 as well as the
 	Let's Encrypt CA cert and the ProtonVPN ike root cert
+endef
+
+define Package/strongswan-eap-mschapv2
+$(call Package/strongswaneapmschapv2/Default)
+endef
+
+define Package/strongswan-eap-mschapv2-light
+$(call Package/strongswaneapmschapv2/Default)
 endef
 
 define Build/Compile
 endef
 
-define Package/$(PKG_NAME)/install
+define Package/strongswan-eap-mschapv2/install
+	$(INSTALL_DIR) $(1)/bin/
+	$(INSTALL_BIN) src/ipsec_keepalive.sh $(1)/bin/
 	$(INSTALL_DIR) $(1)/etc/ssl/certs
 	$(INSTALL_DIR) $(1)/etc/ipsec.d
 	$(LN) /etc/ssl/certs $(1)/etc/ipsec.d/cacerts
@@ -86,4 +100,20 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_DATA) $(DL_DIR)/$(SURFSHARK_FILENAME) $(1)/etc/ssl/certs
 endef
 
-$(eval $(call BuildPackage,$(PKG_NAME)))
+define Package/strongswan-eap-mschapv2-light/install
+	$(INSTALL_DIR) $(1)/bin/
+	$(INSTALL_BIN) src/ipsec_keepalive.sh $(1)/bin/
+	$(INSTALL_DIR) $(1)/etc/ssl/certs
+	$(INSTALL_DIR) $(1)/etc/ipsec.d/cacerts
+	$(LN) /etc/ssl/certs/DST_Root_CA_X3.crt  $(1)/etc/ipsec.d/cacerts
+	$(LN) /etc/ssl/certs/ISRG_Root_X1.crt $(1)/etc/ipsec.d/cacerts
+	$(INSTALL_DATA) $(DL_DIR)/$(LE_CERT_FILENAME) $(1)/etc/ssl/certs
+	$(LN) /etc/ssl/certs/$(LE_CERT_FILENAME) $(1)/etc/ipsec.d/cacerts
+	$(INSTALL_DATA) $(DL_DIR)/$(PROTONVPN_FILENAME) $(1)/etc/ssl/certs
+	$(LN) /etc/ssl/certs/$(PROTONVPN_FILENAME) $(1)/etc/ipsec.d/cacerts
+	$(INSTALL_DATA) $(DL_DIR)/$(SURFSHARK_FILENAME) $(1)/etc/ssl/certs
+	$(LN) /etc/ssl/certs/$(SURFSHARK_FILENAME) $(1)/etc/ipsec.d/cacerts
+endef
+
+$(eval $(call BuildPackage,strongswan-eap-mschapv2))
+$(eval $(call BuildPackage,strongswan-eap-mschapv2-light))

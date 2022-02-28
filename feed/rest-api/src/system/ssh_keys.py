@@ -23,7 +23,7 @@ def get_ssh():
     """gets the SSH current keys"""
     public_keys = []
     try:
-        with open("/etc/dropbear/authorized_keys", "r") as auth_keys_file:
+        with open("/etc/dropbear/authorized_keys", "r", encoding="utf-8") as auth_keys_file:
             for line in auth_keys_file.readlines():
                 if line.strip() != "":
                     public_keys.append(line.strip())
@@ -43,7 +43,7 @@ def put_ssh():
             return "Empty or invalid content"
         try:
             received_keys = ssh_json["keys"]
-            with open("/etc/dropbear/authorized_keys", "w") as auth_keys_file:
+            with open("/etc/dropbear/authorized_keys", "w", encoding="utf-8") as auth_keys_file:
                 for key in received_keys:
                     auth_keys_file.write(f"{key.strip()}\n")
             run(["/etc/init.d/dropbear", "reload"], check=False)

@@ -1,6 +1,0 @@
-config user '1'
-	option name 'root'
-	option password 'TOKENPASSWORD'
-
-config version 'version'
-    option api '%V'

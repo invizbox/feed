@@ -2,7 +2,7 @@
 # Copyright 2016 InvizBox Ltd
 # https://www.invizbox.com/lic/license.txt
 
-START=94
+START=22
 APP=wifiwatch.lua
 USE_PROCD=1
 

@@ -1,0 +1,238 @@
+/* Copyright (C) 2021 InvizBox Ltd. */
+
+/* Hide elements from System page */
+#cbi-system-system-description, #cbi-system-system-notes {
+  display: none;
+}
+
+/* Hide OpenWRT logo from navbar */
+#logo {
+  display: none;
+}
+
+/* For the small text on the login page */
+p.note {
+    line-height: 1rem;
+    font-size: 12px;
+    opacity: 0.6;
+}
+
+/* Hide the "Save" button beside the "Save & Apply" button */
+#invizbox-save-apply + .cbi-button.cbi-button-save {
+  display: none;
+}
+
+.read-only-text-area {
+    font-size: 12px;
+    line-height: 1.25;
+    overflow-y: hidden;
+    width: 100%;
+    min-height: 15rem;
+    resize: none;
+    color: #eee;
+    border: 0;
+    border-radius: 0;
+    background-color: #101010;
+    box-shadow: 0 2px 2px 0 rgba(0,0,0,.16),0 0 2px 0 rgba(0,0,0,.12);
+    padding: 1rem;
+}
+
+.editable-text-area {
+    font-size: 12px;
+    line-height: 1.25;
+    overflow-y: hidden;
+    width: 100%;
+    min-height: 15rem;
+    resize: none;
+    padding: 1rem;
+}
+
+.h1, .h2, .h3, .h4, .h5, .h6, h1, h2, h3, h4, h5, h6 {
+    border-bottom: none !important;
+}
+
+h2[name="content"] {
+    text-align: center;
+}
+
+header {
+    background: #fff !important;
+    border-bottom: 1px solid #ced4da;
+    box-shadow: none !important;
+}
+
+a[data-title="Home"] {
+    text-decoration: none !important;
+}
+
+body {
+    margin: 0;
+    font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 0.9375rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #495057;
+    text-align: left;
+    background-color: #f5f7fb !important;
+}
+
+.loading, .main-right, #maincontent {
+    background-color: #f5f7fb !important;
+}
+
+.cbi-section, .cbi-section[data-tab-active="true"] {
+    border-radius: 3px !important;
+    box-shadow: none !important;
+    border: 1px solid #ced4da !important;
+    padding: 1rem !important;
+}
+
+.cbi-button, .cbi-button.cbi-button-apply, .cbi-button.cbi-button-button, .cbi-button-action {
+    border: none !important;
+    color: #FFF !important;
+    background-color: #4da1ff !important;
+    padding: 0.375rem 0.75rem !important;
+}
+
+.cbi-button.cbi-button-button {
+    color: #FFF;
+}
+
+#indicators [data-indicator]:not([data-style="inactive"]) {
+    background-color: #4da1ff !important;
+}
+
+.cbi-progressbar > div, .ifacebox-head.active {
+    background-color: #4DA1FF !important;
+}
+
+.cbi-section table.table {
+    font-size: .8rem !important;
+}
+
+input[type="text"], .cbi-input-select, .cbi-input-text, .cbi-input-password {
+    border: 1px solid #ced4da !important;
+    border-radius: 3px !important;
+    padding: 0.5rem 1.75rem 0.5rem 0.75rem !important;
+    height: unset !important;
+}
+
+#invizbox-save-apply {
+    background-color: #A6E50F !important;
+}
+
+button[title="Reveal/hide password"] {
+    background-color: #FFF !important;
+    color: #45aaf2 !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 3px !important;
+}
+
+.cbi-map-descr {
+    text-align: center;
+}
+
+.brand img {
+    display: table-cell !important;
+    vertical-align: middle !important;
+}
+
+.alert-message {
+    border: 1px solid transparent;
+    border-radius: 3px;
+}
+
+@media screen and (max-width: 1152px) {
+    header > .fill > .container > .brand {
+        position: absolute !important;
+    }
+}
+
+.node-main-login > .main .container {
+    background-color: unset !important;
+    box-shadow: none !important;
+}
+
+#invizbox-original-image {
+    display: flex;
+    margin: auto;
+}
+
+ul.nav:first-child > li > a[data-title="Home"] {
+    font-size: 1.15rem;
+    font-weight: 500;
+    align-items: center;
+    width: 100%;
+    color: #000 !important;
+}
+
+@media screen and (max-width: 1366px) {
+    ul.nav:first-child > li > a[data-title="Home"] {
+        font-size: 0.9rem;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    ul.nav:first-child > li > a[data-title="Home"] {
+        font-size: 1.2rem;
+    }
+}
+
+.main > .main-left > .nav > li:last-child {
+    padding: 0 !important;
+}
+
+.main > .main-left > .nav > li:last-child::before {
+    content: none !important;
+}
+
+.main > .main-left > .nav > .slide > .slide-menu > .active {
+    background-color: #4DA1FF !important;
+}
+
+.tabs > li[class~="active"] > a {
+    color: #4DA1FF !important;
+}
+
+.tabs > li[class~="active"], .tabs > li:hover {
+    border-bottom-color: #4DA1FF !important;
+}
+
+button[title="Reveal/hide password"] {
+    height: unset !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 2px;
+}
+
+.tor-action-button {
+    margin: 0 0.5rem 0.5rem 0;
+}
+
+a.brand {
+    top: 1rem !important;
+}
+
+@media screen and (max-width: 1366px) {
+    .blank-table-cell {
+        display: none;
+    }
+}
+
+.logged-in #maincontent {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+footer {
+    background: #fff;
+    border-top: 1px solid #ced4da;
+    clear: both;
+    position: relative;
+    height: 4em;
+    text-align: center !important;
+    overflow: unset !important;
+    margin-top: 2em;
+}

@@ -1,0 +1,104 @@
+#!/bin/sh /etc/rc.common
+# Copyright 2020 InvizBox Ltd
+# https://www.invizbox.com/lic/license.txt
+
+START=90
+USE_PROCD=1
+
+EXTRA_COMMANDS="status"
+EXTRA_HELP="status	shows status"
+
+start_instance() {
+	instance="$1"
+	config_get_bool enabled "$instance" 'enabled' 0
+	[ ${enabled} -gt 0 ] || return 1
+	config_get address "$instance" 'address'
+	config_get filename "$instance" 'filename' '/etc/wireguard/wg.conf'
+
+	conn_number=${instance:4}
+	dev="tun${conn_number}"
+
+	procd_open_instance "$instance"
+	procd_set_param command /bin/true
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+
+	mkdir -p /tmp/openvpn/${conn_number}/
+
+	ip link add dev "${dev}" type wireguard
+	ip address add dev "${dev}" "${address}"/32
+	wg setconf "${dev}" "${filename}"
+	ip link set up dev "${dev}"
+	ip route add default proto static via "${address}" dev "${dev}" table "${conn_number}"
+#	if needed, add mtu handling
+#	wan_mtu=$(cat /sys/class/net/eth0.2/mtu)
+#	ping_mtu=$(expr ${wan_mtu} - 28)
+#	ifconfig ${dev} mtu "${wan_mtu}" up
+#	new_mtu=$(ping -s ${ping_mtu} -c1 -M do -I ${dev} 8.8.8.8 2>/dev/null | grep 'Frag needed' | awk '{print substr($11,0,length($11)-1)}')
+#	if [ -n "${new_mtu}" ]; then
+#		ifconfig ${dev} mtu ${new_mtu} up
+#	fi
+	echo "up" > "/tmp/openvpn/${conn_number}/status"
+}
+
+stop_instance()  {
+	instance="$1"
+	conn_number=${instance:4}
+	dev="tun${conn_number}"
+
+	mkdir -p  /tmp/openvpn/${conn_number}/
+
+	ip route del default table ${conn_number} 2>dev/null
+	ip link del dev ${dev} 2>dev/null
+	echo "down" > /tmp/openvpn/${conn_number}/status
+}
+
+start_service() {
+	instance="$1"
+	instance_found=0
+
+	config_cb() {
+		if [ "$1" = "wireguard" -a -n "$instance" -a "$instance" = "$2" ]; then
+			instance_found=1
+		fi
+	}
+
+	config_load 'wireguard'
+
+	if [ -n "$instance" ]; then
+		[ "$instance_found" -gt 0 ] || return
+		start_instance "$instance"
+	else
+		config_foreach start_instance 'wireguard'
+	fi
+}
+
+stop_service() {
+	instance="$1"
+	instance_found=0
+
+	config_cb() {
+		if [ "$1" = "wireguard" -a -n "$instance" -a "$instance" = "$2" ]; then
+			instance_found=1
+		fi
+	}
+
+	config_load 'wireguard'
+
+	if [ -n "$instance" ]; then
+		[ "$instance_found" -gt 0 ] || return
+		stop_instance "$instance"
+	else
+		config_foreach stop_instance 'wireguard'
+	fi
+}
+
+service_triggers() {
+	procd_add_reload_trigger wireguard
+}
+
+status()
+{
+	wg show
+}

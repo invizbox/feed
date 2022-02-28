@@ -1,0 +1,29 @@
+{
+	"luci-app-invizbox": {
+		"description": "Grant access to LuCI app InvizBox",
+		"write": {
+			"uci": ["dns", "ipsec", "openvpn", "tor", "vpn"]
+		},
+		"read": {
+			"file": {
+				"/etc/init.d/dnsmasq restart" : [ "exec" ],
+				"/etc/init.d/tor stop" : [ "exec" ],
+				"/etc/init.d/tor restart" : [ "exec" ],
+				"/etc/openvpn/login.auth": ["write"],
+				"/etc/tor/bridges": [ "read", "write" ],
+				"/etc/tor/geoip": [ "read", "write" ],
+				"/etc/tor/proxy": [ "read", "write" ],
+				"/rom/etc/tor/torrc": [ "read" ],
+				"/etc/tor/torrc": [ "write" ],
+				"/usr/lib/lua/luci/apply_vpn_config.lua" : [ "exec" ],
+				"/usr/lib/lua/luci/tor_circuit_status.lua" : [ "exec" ],
+				"/usr/lib/lua/luci/tor_connection_status.lua" : [ "exec" ],
+				"/usr/lib/lua/luci/tor_new_identity.lua" : [ "exec" ],
+				"/usr/lib/lua/luci/tor_version.lua" : [ "exec" ],
+				"/usr/lib/lua/update.lua" : [ "exec" ],
+				"/var/log/update.log": [ "read" ]
+			},
+			"uci": ["dns", "ipsec", "openvpn", "tor", "vpn"]
+		}
+	}
+}

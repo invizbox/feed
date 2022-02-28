@@ -9,11 +9,14 @@
 #        https://www.invizbox.com/lic/license.txt
 
 . /lib/functions.sh
-function version { printf "%03d%03d%03d" $(echo "$1" | tr '.' ' '); }
-function replace_first { sed -i -e "1s/$1/$2/;t" -e "1,/$1/s//$2/" $3; }
+. /bin/invizboxutils.sh
+
+function replace_first { sed -i -e "1s/$1/$2/;t" -e "1,/$1/s//$2/" "$3"; }
 
 pre_update_version=$(uci get update.version.firmware)
-if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
+provider_id=$(uci get vpn.active.provider)
+
+if [ "$(version "${pre_update_version}")" -lt "$(version 0.0.41)" ]; then
     # system
     if [ "$(uci get system.system.hostname)" == "inviz.box" ]; then
         uci set system.system.hostname=invizbox2
@@ -21,7 +24,7 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
     fi
 
     # network
-    if [ -z $(uci get network.vpn2_to_vpn1) ]; then
+    if [ -z "$(uci get network.vpn2_to_vpn1)" ]; then
         uci set network.vpn2_to_vpn1=route
         uci set network.vpn2_to_vpn1.interface=lan_vpn2
         uci set network.vpn2_to_vpn1.target=10.154.1.0
@@ -221,8 +224,7 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
     fi
 
     # firewall - where order matters
-    grep lan_all /etc/config/firewall -q
-    if [ "$?" -ne "0" ]; then
+    if ! grep lan_all /etc/config/firewall -q; then
         replace_first "config defaults$" "config defaults 'defaults'" /etc/config/firewall
         replace_first "config rule$" "config rule 'dhcp_renew'" /etc/config/firewall
         replace_first "config zone$" "config zone 'wan_zone'" /etc/config/firewall
@@ -404,8 +406,7 @@ iptables -t mangle -A FORWARD -j CONNMARK --restore-mark -m comment --comment "!
 
 EOT
 	fi
-    grep src_dport /etc/config/firewall -q
-    if [ "$?" -ne "0" ]; then
+    if ! grep src_dport /etc/config/firewall -q; then
         uci set firewall.dns_vpn1=redirect
         uci set firewall.dns_vpn1.dest_ip=10.154.0.1
         uci set firewall.dns_vpn1.dest_port=53
@@ -471,8 +472,7 @@ EOT
         uci reorder firewall.dns_local=36
         uci commit firewall
     fi
-    grep tunnels /etc/config/firewall -q
-    if [ "$?" -ne "0" ]; then
+    if ! grep tunnels /etc/config/firewall -q; then
         uci set firewall.tunnels_zone=zone
         uci set firewall.tunnels_zone.mtu_fix=1
         uci set firewall.tunnels_zone.name=tunnels
@@ -485,21 +485,20 @@ EOT
 	fi
 
     #dhcp
-    grep classless-static-route /etc/config/dhcp -q
-    if [ "$?" -ne "0" ]; then
-        provider=$(uci get update.urls.nearest_cities | cut -d '/' -f 3)
+    if ! grep classless-static-route /etc/config/dhcp -q; then
+
         dns_server1=10.255.255.1
         dns_server2=10.255.255.2
-        if [ "${provider}" == "expressvpn" ] || [ "${provider}" == "vanishedvpn" ]; then
+        if [ "${provider_id}" == "expressvpn" ] || [ "${provider_id}" == "vanishedvpn" ]; then
             dns_server1=8.8.8.8
             dns_server2=8.8.4.4
-        elif [ "${provider}" == "ipvanish" ]; then
+        elif [ "${provider_id}" == "ipvanish" ]; then
             dns_server1=198.18.0.1
             dns_server2=198.18.0.2
-        elif [ "${provider}" == "nordvpn" ]; then
+        elif [ "${provider_id}" == "nordvpn" ]; then
             dns_server1=103.86.96.100
             dns_server2=103.86.99.100
-        elif [ "${provider}" == "pia" ]; then
+        elif [ "${provider_id}" == "pia" ]; then
             dns_server1=209.222.18.222
             dns_server2=209.222.18.218
         fi
@@ -681,7 +680,10 @@ EOT
     fi
 fi
 
-if [ $(version ${pre_update_version}) -lt $(version 0.1.0) ]; then
+if [ "$(version "${pre_update_version}")" -lt "$(version 0.1.0)" ]; then
+    # dhcp
+    uci del_list dhcp.tor.rebind_domain=onion
+    uci commit dhcp
     # firewall - where order matters
     uci set firewall.vpn1_to_all=rule
     uci set firewall.vpn1_to_all.src=lan_vpn1
@@ -747,4 +749,176 @@ if [ $(version ${pre_update_version}) -lt $(version 0.1.0) ]; then
     uci set firewall.local_to_all.target=ACCEPT
     uci reorder firewall.local_to_all=18
     uci commit firewall
+fi
+if [ "$(version "${pre_update_version}")" -lt "$(version 4.1.3)" ]; then
+    # crontab
+    echo "* * * * * /bin/ipsec_keepalive.sh" >>/etc/crontabs/root
+    # dhcp
+    sed -i 's|/tmp/resolv.conf.auto|/tmp/resolv.conf.d/resolv.conf.auto|' /etc/config/dhcp
+    uci delete dhcp.invizbox.leasefile
+    uci del_list dhcp.lan_vpn1.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.0.1"
+    uci add_list dhcp.lan_vpn1.dhcp_option="option:classless-static-route,0.0.0.0/0,10.154.0.1,10.154.0.0/21,10.154.0.1"
+    uci del_list dhcp.lan_vpn2.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.1.1"
+    uci add_list dhcp.lan_vpn2.dhcp_option="option:classless-static-route,0.0.0.0/0,10.154.1.1,10.154.0.0/21,10.154.1.1"
+    uci del_list dhcp.lan_vpn3.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.2.1"
+    uci add_list dhcp.lan_vpn3.dhcp_option="option:classless-static-route,0.0.0.0/0,10.154.2.1,10.154.0.0/21,10.154.2.1"
+    uci del_list dhcp.lan_vpn4.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.3.1"
+    uci add_list dhcp.lan_vpn4.dhcp_option="option:classless-static-route,0.0.0.0/0,10.154.3.1,10.154.0.0/21,10.154.3.1"
+    uci del_list dhcp.lan_tor.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.4.1"
+    uci add_list dhcp.lan_tor.dhcp_option="option:classless-static-route,0.0.0.0/0,10.154.4.1,10.154.0.0/21,10.154.4.1"
+    uci del_list dhcp.lan_clear1.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.5.1"
+    uci add_list dhcp.lan_clear1.dhcp_option="option:classless-static-route,0.0.0.0/0,10.154.5.1,10.154.0.0/21,10.154.5.1"
+    uci del_list dhcp.lan_clear2.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.6.1"
+    uci add_list dhcp.lan_clear2.dhcp_option="option:classless-static-route,0.0.0.0/0,10.154.6.1,10.154.0.0/21,10.154.6.1"
+    uci del_list dhcp.lan_local.dhcp_option="option:classless-static-route,10.154.0.0/21,10.154.7.1"
+    uci add_list dhcp.lan_local.dhcp_option="option:classless-static-route,0.0.0.0/0,10.154.7.1,10.154.0.0/21,10.154.7.1"
+    uci commit dhcp
+    # firewall
+    sed -i 's|-A PREROUTING|-A FORWARD|' /etc/firewall.user
+    sed -i "s/\toption set_mark/\toption dest 'lan_all'\n\toption set_mark/g" /etc/config/firewall
+    # fstab
+    uci set fstab.global.anon_mount=1
+    uci commit fstab
+    # ipsec
+    echo -e "charon {\n    make_before_break = yes\n}\n" >/etc/strongswan.d/charon.conf
+    uci set ipsec.tunnel.keyingtries="%forever"
+    uci commit ipsec
+    # network
+    uci set network.loopback.device=lo
+    uci delete network.loopback.ifname
+    uci set network.br_lan_vpn1=device
+    uci set network.br_lan_vpn1.name=br-lan_vpn1
+    uci set network.br_lan_vpn1.type=bridge
+    if [ -n "$(uci -q get network.lan_vpn1.ifname)" ]; then
+        uci add_list network.br_lan_vpn1.ports=$(uci get network.lan_vpn1.ifname)
+        uci delete network.lan_vpn1.ifname
+    fi
+    uci delete network.lan_vpn1.type
+    uci set network.lan_vpn1.device=br-lan_vpn1
+    uci set network.br_lan_vpn2=device
+    uci set network.br_lan_vpn2.name=br-lan_vpn2
+    uci set network.br_lan_vpn2.type=bridge
+    if [ -n "$(uci -q get network.lan_vpn2.ifname)" ]; then
+        uci add_list network.br_lan_vpn2.ports=$(uci get network.lan_vpn2.ifname)
+        uci delete network.lan_vpn2.ifname
+    fi
+    uci delete network.lan_vpn2.type
+    uci set network.lan_vpn2.device=br-lan_vpn2
+    uci set network.br_lan_vpn3=device
+    uci set network.br_lan_vpn3.name=br-lan_vpn3
+    uci set network.br_lan_vpn3.type=bridge
+    if [ -n "$(uci -q get network.lan_vpn3.ifname)" ]; then
+        uci add_list network.br_lan_vpn3.ports=$(uci get network.lan_vpn3.ifname)
+        uci delete network.lan_vpn3.ifname
+    fi
+    uci delete network.lan_vpn3.type
+    uci set network.lan_vpn3.device=br-lan_vpn3
+    uci set network.br_lan_vpn4=device
+    uci set network.br_lan_vpn4.name=br-lan_vpn4
+    uci set network.br_lan_vpn4.type=bridge
+    if [ -n "$(uci -q get network.lan_vpn4.ifname)" ]; then
+        uci add_list network.br_lan_vpn4.ports=$(uci get network.lan_vpn4.ifname)
+        uci delete network.lan_vpn4.ifname
+    fi
+    uci delete network.lan_vpn4.type
+    uci set network.lan_vpn4.device=br-lan_vpn4
+    uci set network.br_lan_tor=device
+    uci set network.br_lan_tor.name=br-lan_tor
+    uci set network.br_lan_tor.type=bridge
+    if [ -n "e)" ] -q; then
+        uci add_list network.br_lan_tor.ports=$(uci get network.lan_tor.ifname)
+        uci delete network.lan_tor.ifname
+    fi
+    uci delete network.lan_tor.type
+    uci set network.lan_tor.device=br-lan_tor
+    uci set network.br_lan_clear1=device
+    uci set network.br_lan_clear1.name=br-lan_clear1
+    uci set network.br_lan_clear1.type=bridge
+    if [ -n "$(uci -q get network.lan_clear1.ifname)" ]; then
+        uci add_list network.br_lan_clear1.ports=$(uci get network.lan_clear1.ifname)
+        uci delete network.lan_clear1.ifname
+    fi
+    uci delete network.lan_clear1.type
+    uci set network.lan_clear1.device=br-lan_clear1
+    uci set network.br_lan_clear2=device
+    uci set network.br_lan_clear2.name=br-lan_clear2
+    uci set network.br_lan_clear2.type=bridge
+    if [ -n "$(uci -q get network.lan_clear2.ifname)" ]; then
+        uci add_list network.br_lan_clear2.ports=$(uci get network.lan_clear2.ifname)
+        uci delete network.lan_clear2.ifname
+    fi
+    uci delete network.lan_clear2.type
+    uci set network.lan_clear2.device=br-lan_clear2
+    uci set network.br_lan_local=device
+    uci set network.br_lan_local.name=br-lan_local
+    uci set network.br_lan_local.type=bridge
+    if [ -n "$(uci -q get network.lan_local.ifname)" ]; then
+        uci add_list network.br_lan_local.ports=$(uci get network.lan_local.ifname)
+        uci delete network.lan_local.ifname
+    fi
+    uci delete network.lan_local.type
+    uci set network.lan_local.device=br-lan_local
+    uci set network.vpn1_lookup_1=rule
+    uci set network.vpn1_lookup_1.in=lan_vpn1
+    uci set network.vpn1_lookup_1.lookup=1
+    uci set network.vpn1_to_local=route
+    uci set network.vpn1_to_local.interface=loopback
+    uci set network.vpn1_to_local.target=127.0.0.0
+    uci set network.vpn1_to_local.netmask=255.0.0.0
+    uci set network.vpn1_to_local.table=1
+    uci set network.vpn2_lookup_2=rule
+    uci set network.vpn2_lookup_2.in=lan_vpn2
+    uci set network.vpn2_lookup_2.lookup=2
+    uci set network.vpn2_to_local=route
+    uci set network.vpn2_to_local.interface=loopback
+    uci set network.vpn2_to_local.target=127.0.0.0
+    uci set network.vpn2_to_local.netmask=255.0.0.0
+    uci set network.vpn2_to_local.table=2
+    uci set network.vpn3_lookup_3=rule
+    uci set network.vpn3_lookup_3.in=lan_vpn3
+    uci set network.vpn3_lookup_3.lookup=3
+    uci set network.vpn3_to_local=route
+    uci set network.vpn3_to_local.interface=loopback
+    uci set network.vpn3_to_local.target=127.0.0.0
+    uci set network.vpn3_to_local.netmask=255.0.0.0
+    uci set network.vpn3_to_local.table=3
+    uci set network.vpn4_lookup_4=rule
+    uci set network.vpn4_lookup_4.in=lan_vpn4
+    uci set network.vpn4_lookup_4.lookup=4
+    uci set network.vpn4_to_local=route
+    uci set network.vpn4_to_local.interface=loopback
+    uci set network.vpn4_to_local.target=127.0.0.0
+    uci set network.vpn4_to_local.netmask=255.0.0.0
+    uci set network.vpn4_to_local.table=4
+    uci commit network
+    # system
+    uci set system.system.cronloglevel=9
+    uci set system.rngd=rngd
+    uci set system.rngd.device=/dev/urandom
+    uci set system.rngd.enabled=1
+    uci delete system.ntp.enable_server
+    uci commit system
+    # wireless
+    sed -i -e 's/radio1/radio_temp/g;s/radio0/radio1/g;s/radio_temp/radio0/g' /etc/config/wireless
+    uci set wireless.radio1.channel=11
+    uci set wireless.radio1.hwmode=11n
+    uci set wireless.radio1.htmode=HT20
+    uci delete wireless.radio1.txpower
+    uci delete wireless.lan.ifname
+    uci delete wireless.ap_vpn2.ifname
+    uci delete wireless.ap_vpn3.ifname
+    uci delete wireless.ap_vpn4.ifname
+    uci delete wireless.ap_tor.ifname
+    uci delete wireless.ap_clear1.ifname
+    uci delete wireless.ap_clear2.ifname
+    uci delete wireless.ap_local.ifname
+    uci delete wireless.lan_5GHz.ifname
+    uci set wireless.lan_5GHz.powersave=0
+    uci commit wireless
+    # tor
+    sed -i 's/10.154.0.1/10.154.4.1/' /etc/tor/torrc
+fi
+if [ "$(version "${pre_update_version}")" -lt "$(version 4.1.13)" ]; then
+    # ipsec
+    rm /etc/strongswan.d/charon.conf
 fi

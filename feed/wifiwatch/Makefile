@@ -4,16 +4,14 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=wifiwatch
 PKG_VERSION:=1.6
-PKG_RELEASE:=1
-
-PKG_BUILD_DIR:=$(BUILD_DIR)/wifiwatch
+PKG_RELEASE:=10
 
 include $(INCLUDE_DIR)/package.mk
 
 define Package/wifiwatch
 	SECTION:=invizbox
 	CATEGORY:=InvizBox
-	DEPENDS:=+invizboxutils +iw +openvpn-openssl
+	DEPENDS:=+invizboxutils
 	TITLE:=WiFi access point Watcher
 endef
 
@@ -26,9 +24,9 @@ endef
 
 define Package/wifiwatch/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua
-	$(INSTALL_BIN) ./src/* $(1)/usr/lib/lua/
+	$(INSTALL_BIN) lua/src/* $(1)/usr/lib/lua/
 	$(INSTALL_DIR) $(1)/
-	$(CP) ./root/* $(1)/
+	$(CP) root/* $(1)/
 endef
 
 define Package/wifiwatch/preinst

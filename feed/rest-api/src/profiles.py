@@ -3,7 +3,7 @@
 """
 import logging
 from time import sleep
-from threading import Thread, Lock
+from threading import Lock
 from subprocess import run
 from uuid import uuid4
 from os import system
@@ -105,7 +105,7 @@ def validate_profile(updated_profile, uci):
 def persist_profiles():
     """ persist the profiles to file """
     try:
-        with open(PROFILES_APP.file, "w") as profiles_file:
+        with open(PROFILES_APP.file, "w", encoding="utf-8") as profiles_file:
             try:
                 dump(PROFILES_APP.profiles, profiles_file)
             except (IOError, JSONDecodeError):
@@ -120,7 +120,7 @@ def get_profiles():
     """ list the profiles """
     if not PROFILES_APP.profiles:
         try:
-            with open(PROFILES_APP.file, "r") as profiles_file:
+            with open(PROFILES_APP.file, "r", encoding="utf-8") as profiles_file:
                 PROFILES_APP.profiles = load(profiles_file)
         except (FileNotFoundError, IOError, JSONDecodeError):
             PROFILES_APP.profiles = {"profiles": []}
@@ -222,6 +222,7 @@ def create_blocking_rule(uci, network_id, mac_address, rule):
 def create_device_access_rule(uci, network_id, mac_address):
     """ helper function to create a device access rule firewall rule """
     device_access_rule = {".type": "rule",
+                          "dest": "lan_all",
                           "id": uuid4().hex,
                           "src_mac": mac_address,
                           "set_mark": NETWORK_MARKS[network_id],
@@ -237,7 +238,7 @@ def rebuild_site_blocking(uci, network_id, profile):
         if profile["siteBlocking"]["enabled"]:
             user_list_file = f"/etc/dns_blacklist/{network_id}.blacklist"
             try:
-                with open(user_list_file, "w") as file:
+                with open(user_list_file, "w", encoding="utf-8") as file:
                     if profile["siteBlocking"]["sites"]:
                         separator = '/\nserver=/'
                         file.write(f"server=/{separator.join(profile['siteBlocking']['sites'])}/\n")
@@ -352,6 +353,3 @@ def aggregate_loop(uci):
                 if network[".type"] == "network" and network["id"] != "lan_local"\
                         and "profile_id" in network and network["profile_id"]:
                     rebuild_site_blocking(uci, network["id"], get_profile(network["profile_id"]))
-
-
-PROFILES_APP.aggregate_thread = Thread(target=aggregate_loop, args=(UCI_PLUGIN.uci,), daemon=True)

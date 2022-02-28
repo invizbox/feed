@@ -1,0 +1,28 @@
+--- a/bottle_jwt/auth.py
++++ b/bottle_jwt/auth.py
+@@ -9,6 +9,7 @@ from __future__ import print_function
+ 
+ import base64
+ import bottle
++from calendar import timegm
+ import collections
+ import jwt
+ import datetime
+@@ -99,7 +100,7 @@ class JWTProvider(object):
+ 
+         logger.debug("Token created for payload: {}".format(str(payload)))
+ 
+-        return jwt.encode(payload, self.secret, algorithm=self.algorithm), payload['exp']
++        return jwt.encode(payload, self.secret, algorithm=self.algorithm), timegm(payload['exp'].utctimetuple())
+ 
+     def validate_token(self, token=''):
+         """Validate JWT token.
+@@ -224,7 +225,7 @@ class JWTProviderPlugin(object):
+             def auth_handler():
+                 try:
+                     token, expires = self.provider.authenticate(bottle.request)
+-                    return {"token": token.decode("utf-8"), "expires": str(expires)}
++                    return {"token": token, "expires": str(expires)}
+ 
+                 except JWTAuthError as error:
+                     return {"AuthError": error.args[0]}

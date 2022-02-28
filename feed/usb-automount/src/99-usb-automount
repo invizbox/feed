@@ -1,0 +1,92 @@
+# Copyright 2021 InvizBox Ltd
+# https://www.invizbox.com/lic/license.txt
+
+kernel_log () {
+    echo "$1" > /dev/kmsg
+}
+
+write_wifi_password () {
+    directory="$1"
+    password_file="${directory}/wifi_password.txt"
+    if [ -f "${password_file}" ]; then
+        kernel_log "writing a wifi password from USB"
+        password=$(head -c 16 "${password_file}")
+        if write_string_to_mtd2 "${password}" 16 65520 "WiFi password"; then
+            echo "${password}" >> "${directory}/written_wifi_pass.txt"
+            sed -i '1d' "${password_file}"
+            led_password_written
+        fi
+        return 0
+    fi
+    return 1
+}
+
+write_vpn_credentials () {
+    directory="$1"
+    vpn_file="${directory}/vpn_credentials.txt"
+    if [ -f "${vpn_file}" ]; then
+        kernel_log "writing VPN credentials from USB"
+        read -r vpn_username vpn_password plan < "${vpn_file}"
+        if write_string_to_mtd2 "${vpn_username}" 64 65432 "OpenVPN username" \
+        && write_string_to_mtd2 "${vpn_password}" 24 65496 "OpenVPN password" \
+        && write_string_to_mtd2 "${plan}" 20 65324 "provider plan"; then
+           echo "${vpn_username}" "${vpn_password}" "${plan}" >> "${directory}/written_vpn_cred.txt"
+           sed -i '1d' "${vpn_file}"
+           led_credentials_written
+        fi
+        return 0
+    fi
+    return 1
+}
+
+write_ipsec_credentials () {
+    directory="$1"
+    ipsec_file="${directory}/ipsec_credentials.txt"
+    if [ -f "${ipsec_file}" ]; then
+        kernel_log "writing IPSec credentials from USB"
+        read -r ipsec_username ipsec_password < "${ipsec_file}"
+        if write_string_to_mtd2 "${ipsec_username}" 64 65344 "IPSec username" \
+        && write_string_to_mtd2 "${ipsec_password}" 24 65408 "IPSec password"; then
+           echo "${ipsec_username}" "${ipsec_password}" >> "${directory}/written_ipsec_cred.txt"
+           sed -i '1d' "${vpn_file}"
+           led_credentials_written
+        fi
+        return 0
+    fi
+    return 1
+}
+
+write_provider () {
+    directory="$1"
+    provider_file="${directory}/provider.txt"
+    if [ -f "${provider_file}" ]; then
+        kernel_log "writing provider from USB"
+        read -r provider < "${provider_file}"
+        write_string_to_mtd2 "${provider}" 20 65304 "provider"
+        return 0
+    fi
+    return 1
+}
+
+main () {
+    . /bin/ledcontrol.ash
+    . /bin/invizboxutils.sh
+
+    device=`basename ${DEVPATH}`
+    if [ "$(basename $(dirname ${DEVPATH}))" != "block" ] && [ -z "${device##sd*}" ]; then
+        case "${ACTION}" in
+            add)
+                directory="/mnt/${device}"
+                write_wifi_password "${directory}"
+                write_vpn_credentials "${directory}"
+                write_ipsec_credentials "${directory}"
+                write_provider "${directory}"
+                sync
+            ;;
+        esac
+    fi
+}
+
+if [ "$@" = "block" ]; then
+    main
+fi

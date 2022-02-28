@@ -5,16 +5,14 @@ include $(INCLUDE_DIR)/version.mk
 
 PKG_NAME:=configuration-update-ib2
 PKG_VERSION:=$(VERSION_NUMBER)
-PKG_RELEASE:=1
-
-PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
+PKG_RELEASE:=3
 
 include $(INCLUDE_DIR)/package.mk
 
 define Package/$(PKG_NAME)
 	SECTION:=invizbox
 	CATEGORY:=InvizBox
-	DEPENDS:=+ledcontrol-ib2
+	DEPENDS:=+ledcontrol +invizboxutils
 	TITLE:=Manages configuration through updates/upgrades
 endef
 
@@ -27,7 +25,7 @@ endef
 
 define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
-	$(INSTALL_BIN) ./uci-defaults/* $(1)/etc/uci-defaults/
+	$(INSTALL_BIN) uci-defaults/* $(1)/etc/uci-defaults/
 endef
 
 $(eval $(call BuildPackage,$(PKG_NAME)))

@@ -28,7 +28,7 @@ def reboot():
     """reboots the device"""
     LOGGER.warning("Rebooting.")
     ADMIN_INTERFACE_APP.ping_ready = False
-    system(". /bin/ledcontrol.ash; led_info_quick_flashing")
+    system(". /bin/ledcontrol.ash; led_restarting")
     system("/sbin/reboot &")
 
 
@@ -38,7 +38,7 @@ def reset():
     """resets the device"""
     LOGGER.warning("Resetting to first boot.")
     ADMIN_INTERFACE_APP.ping_ready = False
-    system(". /bin/ledcontrol.ash; led_info_quick_flashing")
+    system(". /bin/ledcontrol.ash; led_restarting")
     system("firstboot -y")
     system("/sbin/reboot &")
 
@@ -66,10 +66,7 @@ def checking_for_updates():
 def get_timezone(uci):
     """resets the device"""
     try:
-        system_uci = uci.get_package(SYSTEM_PKG)
-        system_section = next(section for section in system_uci
-                              if section[".type"] == "system" and section["id"] == "system")
-        current_timezone = system_section["zonename"]
+        current_timezone = uci.get_option(SYSTEM_PKG, "system", "zonename")
         return {"current": current_timezone.replace(' ', '_'),
                 "available": list(TZ_DATA.keys())}
     except (UciException, StopIteration):

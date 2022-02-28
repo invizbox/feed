@@ -3,10 +3,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=netwatch2
-PKG_VERSION:=1.0
-PKG_RELEASE:=1
-
-PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
+PKG_VERSION:=1.1
+PKG_RELEASE:=10
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -17,8 +15,8 @@ endef
 define Package/$(PKG_NAME)
 	SECTION:=invizbox
 	CATEGORY:=InvizBox
-	DEPENDS:=+invizboxutils +ledcontrol-ib2
-	TITLE:=Network Watcher for IB2
+	DEPENDS:=+invizboxutils +ledcontrol
+	TITLE:=Network Watcher for InvizBox Go and 2
 endef
 
 define Build/Compile
@@ -26,9 +24,11 @@ endef
 
 define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua
-	$(INSTALL_BIN) ./src/* $(1)/usr/lib/lua/
-	$(INSTALL_DIR) $(1)/
-	$(CP) ./root/* $(1)/
+	$(INSTALL_BIN) lua/src/* $(1)/usr/lib/lua/
+	$(INSTALL_DIR) $(1)/bin
+	$(INSTALL_BIN) bin/* $(1)/bin/
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) files/netwatch2.init $(1)/etc/init.d/netwatch2
 endef
 
 $(eval $(call BuildPackage,$(PKG_NAME)))

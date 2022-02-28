@@ -90,7 +90,7 @@ class Uci:
         for config_file_name in glob(self.config_dir + "/" + package):
             package_config = []
             option_config = {}
-            with open(config_file_name) as config_file:
+            with open(config_file_name, encoding="utf-8") as config_file:
                 package = config_file_name.split("/")[-1]
                 for line in config_file:
                     line = line.strip()
@@ -126,7 +126,7 @@ class Uci:
                     if pattern:
                         continue
                     if line != "":
-                        raise UciException("Unknown Line: " + line)
+                        raise UciException("Unknown Line: [" + line + "] in package " + package)
                 # last option in file
                 if option_config:
                     package_config.append(option_config)
@@ -160,7 +160,7 @@ class Uci:
                 print(show_string)
             return show_string
         except KeyError:
-            raise UciException("Invalid Package")
+            raise UciException("Invalid Package") from None
 
     def show_config(self, package, config, print_it=False):
         """ shows a config configuration item by ID in a file compatible structure """
@@ -177,7 +177,7 @@ class Uci:
             current_package = self.uci_config[package]
             return current_package
         except KeyError:
-            raise UciException("Invalid package")
+            raise UciException("Invalid package") from None
 
     def get_config(self, package, config):
         """ get full config """
@@ -186,9 +186,9 @@ class Uci:
             current_config = next(opt for opt in current_package if opt["id"] == config)
             return current_config
         except KeyError:
-            raise UciException("Invalid package")
+            raise UciException("Invalid package") from None
         except StopIteration:
-            raise UciException("Invalid config")
+            raise UciException("Invalid config") from None
 
     def add_config(self, package, config):
         """ add a new config """
@@ -196,7 +196,7 @@ class Uci:
             current_package = self.uci_config[package]
             current_package.append(config)
         except KeyError:
-            raise UciException("Invalid package")
+            raise UciException("Invalid package") from None
 
     def delete_config(self, package, config):
         """ remove a config by id """
@@ -204,7 +204,7 @@ class Uci:
             current_package = self.uci_config[package]
             self.uci_config[package] = [opt for opt in current_package if opt["id"] != config]
         except KeyError:
-            raise UciException("Invalid package")
+            raise UciException("Invalid package") from None
 
     def get_option(self, package, config, option):
         """ get value in memory """
@@ -212,13 +212,13 @@ class Uci:
             current_package = self.uci_config[package]
             current_config = next(opt for opt in current_package if opt["id"] == config)
         except KeyError:
-            raise UciException("Invalid package")
+            raise UciException("Invalid package") from None
         except StopIteration:
-            raise UciException("Invalid config")
+            raise UciException("Invalid config") from None
         try:
             return current_config[option]
         except KeyError:
-            raise UciException("Invalid option")
+            raise UciException("Invalid option") from None
 
     def set_option(self, package, config, option, value):
         """ change a value in memory """
@@ -230,9 +230,9 @@ class Uci:
             current_package = self.uci_config[package]
             current_config = next(opt for opt in current_package if opt["id"] == config)
         except KeyError:
-            raise UciException("Invalid package")
+            raise UciException("Invalid package") from None
         except StopIteration:
-            raise UciException("Invalid config")
+            raise UciException("Invalid config") from None
         current_config[option] = value
 
     def delete_option(self, package, config, option):
@@ -241,19 +241,19 @@ class Uci:
             current_package = self.uci_config[package]
             current_config = next(opt for opt in current_package if opt["id"] == config)
         except KeyError:
-            raise UciException("Invalid package")
+            raise UciException("Invalid package") from None
         except StopIteration:
-            raise UciException("Invalid config")
+            raise UciException("Invalid config") from None
         try:
             del current_config[option]
         except KeyError:
-            raise UciException("Invalid option")
+            raise UciException("Invalid option") from None
 
     def persist(self, package):
         """ Persists to disc the current representation of a UCI package """
         try:
             new_content = self.show_package(package)
-            with open(f"{self.config_dir}/{package}", 'w') as config_handle:
+            with open(f"{self.config_dir}/{package}", 'w', encoding="utf-8") as config_handle:
                 config_handle.write(new_content)
             sync()
         except UciException as exception:

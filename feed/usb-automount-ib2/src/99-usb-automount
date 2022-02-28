@@ -1,0 +1,113 @@
+# Copyright 2021 InvizBox Ltd
+# https://www.invizbox.com/lic/license.txt
+
+kernel_log () {
+    echo "$1" > /dev/kmsg
+}
+
+write_wifi_password () {
+    directory="$1"
+    password_file="${directory}/wifi_password.txt"
+    if [ -f "${password_file}" ]; then
+        kernel_log "writing a wifi password from USB"
+        # a WiFi password has to be between 8 and 63 printable characters
+        password=$(head -n 1 "${password_file}" | tr -d '\n')
+        if ! validate_string_ascii "${password}"; then
+            kernel_log  "password [${password}] string wasn't printable"
+            return 2
+        fi
+        if [ ${#password} -lt 8 ]; then
+            return 3
+        fi
+        if [ ${#password} -gt 63 ]; then
+            return 4
+        fi
+        echo -n "${password}" > /private/wifi_password.txt
+        echo "${password}" >> "${directory}/written_wifi_pass.txt"
+        sed -i '1d' "${password_file}"
+        return 0
+    fi
+    return 1
+}
+
+write_vpn_credentials () {
+    directory="$1"
+    vpn_file="${directory}/vpn_credentials.txt"
+    if [ -f "${vpn_file}" ]; then
+        kernel_log "writing VPN credentials from USB"
+        read vpn_username vpn_password plan < "${vpn_file}"
+        echo -n "${vpn_username} ${vpn_password} ${plan}" > /private/vpn_credentials.txt
+        echo "${vpn_username} ${vpn_password} ${plan}" >> "${directory}/written_vpn_cred.txt"
+        sed -i '1d' "${vpn_file}"
+        return 0
+    fi
+    return 1
+}
+
+write_ipsec_credentials () {
+    directory="$1"
+    ipsec_file="${directory}/ipsec_credentials.txt"
+    if [ -f "${ipsec_file}" ]; then
+        kernel_log "writing IPSec credentials from USB"
+        read ipsec_username ipsec_password < "${ipsec_file}"
+        echo -n "${ipsec_username} ${ipsec_password}" > /private/ipsec_credentials.txt
+        echo "${ipsec_username} ${ipsec_password}" >> "${directory}/written_ipsec_cred.txt"
+        sed -i '1d' "${ipsec_file}"
+        return 0
+    fi
+    return 1
+}
+
+perform_reset () {
+    directory="$1"
+    reset_file="${directory}/reset.txt"
+    if [ -f "${reset_file}" ]; then
+        kernel_log "resetting from USB"
+        mv "${reset_file}" "${directory}/reset_done.txt"
+        led_restarting
+        firstboot -y
+        reboot
+        return 0
+    fi
+    return 1
+}
+
+main () {
+    . /bin/ledcontrol.ash
+    . /bin/invizboxutils.sh
+
+    device=`basename ${DEVPATH}`
+    if [ "$(basename $(dirname ${DEVPATH}))" != "block" ] && [ -z "${device##sd*}" ]; then
+        case "${ACTION}" in
+            add)
+                directory="/mnt/${device}"
+                write_wifi_password "${directory}"
+                flash_password=$?
+                write_vpn_credentials "${directory}"
+                flash_vpn=$?
+                write_ipsec_credentials "${directory}"
+                flash_vpn=$(( $? || ${flash_vpn} ))
+                sync
+                if [ "${flash_password}" -eq "0" ] && [ "${flash_vpn}" -eq "0" ]; then
+                    led_password_and_credentials_written
+                    turn_info_led_off=1
+                elif [ "${flash_password}" -eq "0" ]; then
+                    led_password_written
+                    turn_info_led_off=1
+                elif [ "${flash_vpn}" -eq "0" ]; then
+                    led_credentials_written
+                    turn_info_led_off=1
+                fi
+                if [ "${turn_info_led_off}" -eq "1" ]; then
+                    sleep 5
+                    led_info_off
+                fi
+                perform_reset "${directory}"
+            ;;
+        esac
+    fi
+}
+
+if [ "$@" = "block" ]; then
+    main
+fi

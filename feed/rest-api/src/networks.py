@@ -2,18 +2,22 @@
     https://www.invizbox.com/lic/license.txt
 """
 import logging
-from subprocess import run, CalledProcessError
+from contextlib import suppress
 from json.decoder import JSONDecodeError
-from bottle_jwt import jwt_auth_required
+from os import getenv
+from subprocess import run, CalledProcessError, PIPE
+
 from bottle import Bottle, request, response
+from bottle_jwt import jwt_auth_required
+
+import admin_interface
+import profiles
 from plugins.plugin_jwt import JWT_PLUGIN
 from plugins.plugin_uci import UCI_PLUGIN, UCI_ROM_PLUGIN
 from plugins.uci import UciException
-from utils.validate import validate_option
-import admin_interface
-from system.dns import replace_dnsmasq_servers
 from system import vpn
-import profiles
+from system.dns import replace_dnsmasq_servers
+from utils.validate import validate_option
 
 ADMIN_PKG = "admin-interface"
 DHCP_PKG = "dhcp"
@@ -23,6 +27,7 @@ NETWORK_PKG = "network"
 OPENVPN_PKG = "openvpn"
 VPN_PKG = "vpn"
 WIRELESS_PKG = "wireless"
+WIREGUARD_PKG = "wireguard"
 INTERFACES = {"LAN": "eth0.1", "1": "eth1.1", "2": "eth1.2", "3": "eth1.3", "4": "eth1.4"}
 PORTS = {"eth0.1": "LAN", "eth1.1": "1", "eth1.2": "2", "eth1.3": "3", "eth1.4": "4"}
 LOGGER = logging.getLogger(__name__)
@@ -31,6 +36,7 @@ NETWORKS_APP = Bottle()
 NETWORKS_APP.install(JWT_PLUGIN)
 NETWORKS_APP.install(UCI_PLUGIN)
 NETWORKS_APP.install(UCI_ROM_PLUGIN)
+NETWORKS_APP.model = getenv("DEVICE_PRODUCT", "InvizBox 2")
 NETWORKS_APP.wifi_password = ''
 
 
@@ -60,9 +66,13 @@ def validate_network(network, uci):
             except StopIteration:
                 valid = False
         valid &= validate_option("string_list", network["ports"])
+        valid &= (NETWORKS_APP.model == "InvizBox Go" and network["ports"] == [])\
+            or (NETWORKS_APP.model == "InvizBox 2" and set(network["ports"]).issubset({"LAN"}))\
+            or (NETWORKS_APP.model == "InvizBox 2 Pro" and set(network["ports"]).issubset({"1", "2", "3", "4"}))
         valid &= validate_option("network", [network["dhcp"]["ipaddr"], network["dhcp"]["netmask"]])
         valid &= validate_option("boolean", network["wifi"]["enabled24Ghz"])
         valid &= validate_option("boolean", network["wifi"]["enabled5Ghz"])
+        valid &= NETWORKS_APP.model != "InvizBox Go" or not network["wifi"]["enabled5Ghz"]
         valid &= validate_option("string", network["wifi"]["ssid"])
         valid &= 1 <= len(network["wifi"]["ssid"].encode('utf-8')) <= 27
         valid &= validate_option("boolean", network["wifi"]["encryption"])
@@ -113,18 +123,22 @@ def get_networks_vpn(uci, networks):
     """ add enabled protocol info to networks """
     openvpn_uci = uci.get_package(OPENVPN_PKG)
     ipsec_uci = uci.get_package(IPSEC_PKG)
+    wireguard_uci = uci.get_package(WIREGUARD_PKG)
     for network in networks:
         if network["type"] == "vpn":
             try:
-                tcp_protocol = uci.get_option(VPN_PKG, network["vpn"]["protocolId"], "vpn_protocol")
+                vpn_protocol = uci.get_option(VPN_PKG, network["vpn"]["protocolId"], "vpn_protocol")
             except UciException:
-                tcp_protocol = "unknown"
+                vpn_protocol = "unknown"
             net = None
-            if tcp_protocol == "OpenVPN":
+            if vpn_protocol == "OpenVPN":
                 net = next((net for net in openvpn_uci if net[".type"] == "openvpn"
                             and f"lan_vpn{net['id'][-1]}" == network['id'] and "enabled" in net), None)
-            elif tcp_protocol == "IKEv2":
+            elif vpn_protocol == "IKEv2":
                 net = next((net for net in ipsec_uci if net[".type"] == "remote"
+                            and f"lan_vpn{net['id'][-1]}" == network["id"] and "enabled" in net), None)
+            elif vpn_protocol == "WireGuard":
+                net = next((net for net in wireguard_uci if net[".type"] == "wireguard"
                             and f"lan_vpn{net['id'][-1]}" == network["id"] and "enabled" in net), None)
             if net:
                 network["enabled"] = net["enabled"] == "1"
@@ -138,7 +152,8 @@ def get_networks_vpn_location(uci, networks):
         if network["type"] == "vpn":
             try:
                 entry_name = "vpn_{}".format(network["id"][-1])
-                vpn_entry = next(vpn[entry_name] for vpn in vpn_uci if vpn[".type"] == "active" and entry_name in vpn)
+                vpn_entry = next(active[entry_name] for active in vpn_uci if active[".type"] == "active"
+                                 and entry_name in active)
             except StopIteration:
                 vpn_entry = "unknown"
             network["vpn"]["location"] = vpn_entry
@@ -148,7 +163,7 @@ def get_networks_dhcp(uci, networks):
     """ add dhcp info to networks """
     dhcp_uci = uci.get_package(DHCP_PKG)
     for dhcp in dhcp_uci:
-        if dhcp[".type"] in {"dhcp", "dnsmasq"} and "disabled" in dhcp:
+        if dhcp[".type"] in {"dhcp", "dnsmasq"} and "interface" in dhcp and "disabled" in dhcp:
             for network in networks:
                 if network["id"] == dhcp["interface"]:
                     network["enabled"] &= dhcp["disabled"] != "1"
@@ -170,32 +185,49 @@ def get_networks_admin(uci, networks):
                     if network["id"].startswith("lan_vpn"):
                         network["type"] = "vpn"
                         network["vpn"] = {}
-                        network["vpn"]["protocolId"] = admin["protocol_id"]\
+                        network["vpn"]["protocolId"] = admin["protocol_id"] \
                             if "protocol_id" in admin else first_protocol
                     if network["id"].startswith("lan_clear"):
                         network["dnsProviderId"] = admin["dns_id"] if "dns_id" in admin else ""
                     break
 
 
+def get_networks_mac_address(networks):
+    """ add MAC address info to networks """
+    for network in networks:
+        if network["enabled"] and \
+                (len(network["ports"]) > 0 or (network["wifi"]["enabled24Ghz"] or network["wifi"]["enabled5Ghz"])):
+            try:
+                with open(f"/sys/devices/virtual/net/br-{network['id']}/address", encoding="utf-8") as file:
+                    network["macAddress"] = file.readline().rstrip()
+            except FileNotFoundError:
+                network["macAddress"] = "unknown"
+
+
 def get_networks(uci):
     """" helper function to get all information related to networks from UCI """
     network_uci = uci.get_package(NETWORK_PKG)
+    device_ports = {device["name"]: [PORTS[port] for port in device["ports"]] for _, device in enumerate(network_uci)
+                    if device[".type"] == "device" and "ports" in device}
     networks = [
         {
             "id": network["id"],
             "name": network["id"],
             "enabled": True,
             "type": "tor" if network["id"] == "lan_tor" else "local" if network["id"] == "lan_local" else "clear",
-            "ports": [PORTS[ifname] for ifname in network["ifname"].split(" ")] if "ifname" in network else [],
+            "ports": device_ports[network['device']] if network['device'] in device_ports else [],
             "profileId": None,
             "dhcp": {
                 "ipaddr": network["ipaddr"],
                 "netmask": network["netmask"]
             },
-            "wifi": {"enabled24Ghz": False,
-                     "enabled5Ghz": False}
+            "wifi": {
+                "enabled24Ghz": False,
+                "enabled5Ghz": False
+            },
+            "macAddress": "",
         }
-        for index, network in enumerate(network_uci)
+        for _, network in enumerate(network_uci)
         if network[".type"] == "interface" and network["id"].startswith("lan_")
     ]
     get_networks_admin(uci, networks)
@@ -203,6 +235,7 @@ def get_networks(uci):
     get_networks_vpn(uci, networks)
     get_networks_vpn_location(uci, networks)
     get_networks_dhcp(uci, networks)
+    get_networks_mac_address(networks)
     return networks
 
 
@@ -233,26 +266,24 @@ def get_network(network_id, uci):
 def update_network_network(uci, network_id, updated_network):
     """ update the network part of a specific network """
     network_uci = uci.get_package(NETWORK_PKG)
-    for network in network_uci:
-        if network[".type"] == "interface" and network["id"] == network_id:
-            new_if_list = " ".join([INTERFACES[port] for port in updated_network["ports"]])
+    for config in network_uci:
+        if config[".type"] == "device" and config["id"] == f"br_{network_id}":
+            new_if_list = [INTERFACES[port] for port in sorted(updated_network["ports"])]
             if new_if_list:
-                uci.set_option(NETWORK_PKG, network["id"], "ifname", new_if_list)
+                uci.set_option(NETWORK_PKG, config["id"], "ports", new_if_list)
             else:
                 try:
-                    uci.delete_option(NETWORK_PKG, network["id"], "ifname")
+                    uci.delete_option(NETWORK_PKG, config["id"], "ports")
                 except UciException:
                     pass
-        elif network[".type"] == "interface" and "type" in network and network["type"] == "bridge" \
-                and "ifname" in network:
-            old_if_list = network["ifname"].split(" ")
+        elif config[".type"] == "device" and "ports" in config:
+            old_if_list = config["ports"]
             new_if_list = [ifname for ifname in old_if_list if PORTS[ifname] not in updated_network["ports"]]
             if new_if_list != old_if_list:
                 if new_if_list:
-                    uci.set_option(NETWORK_PKG, network["id"], "ifname", " ".join([INTERFACES[port]
-                                                                                   for port in new_if_list]))
+                    uci.set_option(NETWORK_PKG, config["id"], "ports", sorted(new_if_list))
                 elif old_if_list:
-                    uci.delete_option(NETWORK_PKG, network["id"], "ifname")
+                    uci.delete_option(NETWORK_PKG, config["id"], "ports")
     uci.persist(NETWORK_PKG)
 
 
@@ -293,7 +324,7 @@ def update_network_wireless(uci, network_id, upd_network):
 
 
 def update_network_vpn(uci, network_id, updated_network):
-    """ update the openvpn part of a specific network """
+    """ update the vpn protocol config part of a specific network """
     for openvpn in uci.get_package(OPENVPN_PKG):
         if openvpn[".type"] == "openvpn" and network_id == f"lan_vpn{openvpn['id'][-1]}":
             is_openvpn_network = (updated_network["vpn"]["protocolId"] == "filename" or
@@ -310,15 +341,26 @@ def update_network_vpn(uci, network_id, updated_network):
             is_ikev2_network = (updated_network["vpn"]["protocolId"] != "filename" and
                                 uci.get_option(VPN_PKG, updated_network["vpn"]["protocolId"], "vpn_protocol")
                                 == "IKEv2")
-            if updated_network["enabled"]\
-                    and is_ikev2_network:
+            if updated_network["enabled"] and is_ikev2_network:
                 ipsec_enabled = "1"
             else:
                 ipsec_enabled = "0"
             uci.set_option(IPSEC_PKG, ipsec["id"], "enabled", ipsec_enabled)
             break
+    for wireguard in uci.get_package(WIREGUARD_PKG):
+        if wireguard[".type"] == "wireguard" and network_id == f"lan_vpn{wireguard['id'][-1]}":
+            is_wireguard_network = (updated_network["vpn"]["protocolId"] != "filename" and
+                                    uci.get_option(VPN_PKG, updated_network["vpn"]["protocolId"], "vpn_protocol")
+                                    == "WireGuard")
+            if updated_network["enabled"] and is_wireguard_network:
+                wireguard_enabled = "1"
+            else:
+                wireguard_enabled = "0"
+            uci.set_option(WIREGUARD_PKG, wireguard["id"], "enabled", wireguard_enabled)
+            break
     uci.persist(OPENVPN_PKG)
     uci.persist(IPSEC_PKG)
+    uci.persist(WIREGUARD_PKG)
 
 
 def update_network_vpn_location(uci, network_id, updated_network):
@@ -349,7 +391,7 @@ def update_network_vpn_location(uci, network_id, updated_network):
                         template_file = uci.get_option(VPN_PKG, new_protocol_id, "template")
                         sed_line = f's/@SERVER_ADDRESS@/{server_conf["address"]}/; s/@TUN@/tun{network_id[-1]}/'
                     try:
-                        with open("/tmp/vpn_location", "w") as out_file:
+                        with open("/tmp/vpn_location", "w", encoding="utf-8") as out_file:
                             run(["sed", sed_line, template_file], stdout=out_file, check=True)
                         run(["cp", "/tmp/vpn_location", f"/etc/openvpn/openvpn_{network_id[-1]}.conf"], check=True)
                         LOGGER.info('%s (%s) is now the active VPN location for %s', new_server_id, new_vpn_protocol,
@@ -357,11 +399,14 @@ def update_network_vpn_location(uci, network_id, updated_network):
                     except CalledProcessError:
                         LOGGER.info('error setting %s as the VPN location for %s (%s)', new_server_id, new_vpn_protocol,
                                     entry_name)
-                    uci.set_option(IPSEC_PKG, entry_name, "gateway", "invalid")
-                    uci.set_option(IPSEC_PKG, entry_name, "enabled", "0")
                 elif new_vpn_protocol == "IKEv2":
                     uci.set_option(IPSEC_PKG, entry_name, "gateway", server_conf["address"])
-                uci.persist(IPSEC_PKG)
+                    uci.persist(IPSEC_PKG)
+                elif new_vpn_protocol == "WireGuard":
+                    template_file = uci.get_option(VPN_PKG, new_protocol_id, "template")
+                    uci.set_option(WIREGUARD_PKG, entry_name, "address", server_conf["address"])
+                    uci.set_option(WIREGUARD_PKG, entry_name, "filename", template_file)
+                    uci.persist(WIREGUARD_PKG)
                 # change DNS servers if needed
                 local_dnsmasq_servers = [server for server in uci.get_option(DHCP_PKG, f"vpn{network_id[-1]}", "server")
                                          if tunnel_interface not in server]
@@ -379,7 +424,8 @@ def update_network_dhcp(uci, network_id, updated_network):
     for dhcp in dhcp_uci:
         if dhcp[".type"] == "dhcp" and "disabled" in dhcp and dhcp["interface"] == network_id:
             uci.set_option(DHCP_PKG, dhcp["id"], "disabled", "0" if updated_network["enabled"] else "1")
-        if dhcp[".type"] == "dnsmasq" and "disabled" in dhcp and network_id in dhcp["interface"]:
+        if dhcp[".type"] == "dnsmasq" and "disabled" in dhcp \
+                and "interface" in dhcp and network_id in dhcp["interface"]:
             disable_dnmasq = False
             if updated_network["type"] == "clear":
                 dnsmasq_section = updated_network["id"][4:]
@@ -443,11 +489,14 @@ def restart_processes(restart_dnsmasq, restart_network, restart_vpn):
         if restart_dnsmasq:
             run(["/etc/init.d/dnsmasq", "reload"], check=False)
         if restart_network:
+            with suppress(FileNotFoundError):
+                run(["/etc/init.d/wifiwatch", "restart"], check=False)
             run(["/etc/init.d/network", "reload"], check=False)
         if restart_vpn:
             # the following to make sure all tunnels are down if they need to be created by the other daemon
             run(["/etc/init.d/openvpn", "stop"], check=False)
             run(["/etc/init.d/ipsec", "stop"], check=False)
+            run(["/etc/init.d/wireguard", "reload"], check=False)
             run(["/etc/init.d/openvpn", "start"], check=False)
             run(["/etc/init.d/ipsec", "start"], check=False)
 
@@ -546,17 +595,51 @@ def update_network(network_id, uci):
         return "Invalid content"
 
 
+def set_provider_defaults(network, uci):
+    """ sets provider specific defaults that are not in /rom for a deleted network """
+    if network["type"] == "vpn":
+        try:
+            plan = uci.get_option(VPN_PKG, "active", "plan")
+        except UciException:
+            plan = ""
+        network["vpn"] = {"location": vpn.get_similar_location(uci, None, None, plan)}
+        try:
+            server_protocols = uci.get_option(VPN_PKG, network["vpn"]["location"], "protocol_id")
+            for protocol_id in server_protocols:
+                protocol = uci.get_config(VPN_PKG, protocol_id)
+                if "default" in protocol and protocol["default"] == "true":
+                    network["vpn"]["protocolId"] = protocol["id"]
+        except UciException:
+            network["vpn"]["protocolId"] = "filename"
+    elif network["type"] == "clear":
+        try:
+            network["dnsProviderId"] = next((dns["id"] for dns in uci.get_package(DNS_PKG) if
+                                             dns[".type"] == "servers"
+                                             and "default" in dns
+                                             and dns["default"] == "true"))
+        except (StopIteration, UciException):
+            network["dnsProviderId"] = "opendns"
+    return network
+
+
 @NETWORKS_APP.delete('/networks/<network_id>')
 @jwt_auth_required
 def delete_network(network_id, uci, uci_rom):
     """ delete a specific network """
     LOGGER.debug("delete_network() called")
     if not NETWORKS_APP.wifi_password:
-        try:
-            with open("/private/wifi_password.txt", "r") as password_file:
-                NETWORKS_APP.wifi_password = password_file.readline().rstrip()
-        except FileNotFoundError:
-            pass
+        if NETWORKS_APP.model == "InvizBox Go":
+            try:
+                NETWORKS_APP.wifi_password = run(["dd", "if=/dev/mtd2", "bs=1", "skip=65520", "count=16"],
+                                                 stdout=PIPE, stderr=PIPE, check=False).stdout.decode("utf-8").strip()
+            except (CalledProcessError, UnicodeDecodeError):
+                pass
+        else:
+            try:
+                with open("/private/wifi_password.txt", "r", encoding="utf-8") as password_file:
+                    NETWORKS_APP.wifi_password = password_file.readline().rstrip()
+            except FileNotFoundError:
+                pass
     try:
         networks = get_networks(uci)
         network = next(network for network in networks
@@ -568,9 +651,12 @@ def delete_network(network_id, uci, uci_rom):
         response.status = 400
         return "Not deleting as no connectivity left on other networks"
     try:
-        deleted_network = get_network(network_id if network_id != "lan_vpn1" else "lan_vpn2", uci_rom)
+        rom_network_id = "lan_tor" if network_id == "lan_vpn1" else network_id
+        deleted_network = get_network(rom_network_id, uci_rom)
         deleted_network["id"] = network_id
+        deleted_network["type"] = network["type"]
         deleted_network["wifi"]["key"] = NETWORKS_APP.wifi_password
+        deleted_network = set_provider_defaults(deleted_network, uci)
         do_update_network(network, deleted_network, uci)
     except (UciException, KeyError, TypeError):
         pass

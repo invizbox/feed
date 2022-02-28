@@ -1,4 +1,0 @@
-device_ip=$(uci get network.lan.ipaddr)
-iptables -t nat -I POSTROUTING -o eth0.2 -m comment --comment "!fw3" -j MASQUERADE
-iptables -I FORWARD -i br-lan -o eth0.2 -m conntrack --ctstate NEW,RELATED,ESTABLISHED -m comment --comment "!fw3" -j ACCEPT
-iptables -I FORWARD -d ${device_ip}/32 -i br-lan -o br-lan -m conntrack --ctstate NEW,RELATED,ESTABLISHED -m comment --comment "!fw3" -j ACCEPT

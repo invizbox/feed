@@ -1,0 +1,170 @@
+#!/bin/ash
+
+# Copyright 2020 InvizBox Ltd
+#
+# Licensed under the InvizBox Shared License;
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#        https://www.invizbox.com/lic/license.txt
+
+. /lib/functions.sh
+. /bin/invizboxutils.sh
+
+pre_update_version=$(uci get update.version.firmware)
+provider_id=$(uci get vpn.active.provider)
+
+if [ "$(version "${pre_update_version}")" -lt "$(version 3.0.6)" ]; then
+    # firewall
+    uci set firewall.user_include=include
+    uci set firewall.user_include.enabled=1
+    uci set firewall.user_include.path=/bin/firewall.no_network
+    uci set firewall.user_include.reload=1
+    uci commit firewall
+
+    # network
+    uci del network.globals
+    uci rename network.vpn=vpn_0
+    uci set network.local_vpn_traffic=route
+    uci set network.local_vpn_traffic.interface=lan
+    uci set network.local_vpn_traffic.target=10.101.0.0
+    uci set network.local_vpn_traffic.netmask=255.255.255.0
+    uci set network.local_vpn_traffic.gateway=0.0.0.0
+    uci set network.local_vpn_traffic.table=1
+    uci commit network
+
+    # openvpn
+    uci rename openvpn.vpn=vpn_0
+    uci set openvpn.vpn_0.config=/etc/openvpn/openvpn_0.conf
+    mv /etc/openvpn/openvpn.conf /etc/openvpn/openvpn_0.conf
+    uci commit openvpn
+    sed -i "s/auth-nocache/auth-nocache\nscript-security 2\nroute-noexec\nroute-up \/bin\/route_up.ash\nroute-pre-down \/bin\/route_pre_down.ash/g" /etc/openvpn/openvpn_0.conf
+    sed -i "s/auth-nocache/auth-nocache\nscript-security 2\nroute-noexec\nroute-up \/bin\/route_up.ash\nroute-pre-down \/bin\/route_pre_down.ash/g" /etc/openvpn/templates/*
+
+    # dhcp
+    uci set dhcp.invizbox.leasefile=/tmp/dhcp.leases
+    uci rename dhcp.vpn=vpn0
+    uci del dhcp.vpn0.rebind_domain
+    uci set dhcp.lan.disabled=0
+    uci set dhcp.lan.force=1
+    uci set dhcp.lan.instance=auto
+    uci commit dhcp
+
+    # wizard
+    uci set wizard.main.dns_id=dhcp
+    uci set wizard.main.manual_captive_mode=0
+    uci set wizard.main.status="Default State"
+    uci commit wizard
+
+    # vpn
+    protocol_id=openvpn_tcp_443
+    protocol_name="OpenVPN over TCP port 443"
+    if [ "${provider_id}" == "vanishedvpn" ]; then
+        protocol_id=openvpn_udp_1194
+        protocol_name="OpenVPN over UDP port 1194"
+    fi
+    first_template=$(grep -m1 "option template" /etc/config/vpn | awk '{print $3}' | cut -d "'" -f 2)
+    sed -i "s/\toption template/\tlist protocol_id '${protocol_id}'\n\toption template/g" /etc/config/vpn
+    sed -i "/option template/d" /etc/config/vpn
+    uci set vpn.active.protocol_id=$protocol_id
+    uci rename vpn.active.vpn=vpn_0
+    uci set vpn.$protocol_id=protocol
+    for server in $(uci get dhcp.vpn0.server)
+    do
+        case "$server" in
+            *@tun0) uci add_list vpn.$protocol_id.dns_server="${server::-5}" ;;
+        esac
+    done
+    uci set vpn.$protocol_id.name="${protocol_name}"
+    uci set vpn.$protocol_id.template="$first_template"
+    uci set vpn.$protocol_id.vpn_protocol=OpenVPN
+    uci commit vpn
+fi
+if [ "$(version "${pre_update_version}")" -lt "$(version 4.1.3)" ]; then
+    # dhcp
+    sed -i "s/vpn0/vpn1/g;s/tun0/tun1/g" /etc/config/dhcp
+    sed -i 's|/tmp/resolv.conf.auto|/tmp/resolv.conf.d/resolv.conf.auto|' /etc/config/dhcp
+    uci delete dhcp.invizbox.boguspriv
+    uci delete dhcp.invizbox.filterwin2k
+    uci delete dhcp.invizbox.leasefile
+    uci delete dhcp.invizbox.nonegcache
+    uci delete dhcp.invizbox.nonwildcard
+    uci delete dhcp.invizbox.rebind_protection
+    uci delete dhcp.vpn1.boguspriv
+    uci delete dhcp.vpn1.filterwin2k
+    uci delete dhcp.vpn1.nonegcache
+    uci delete dhcp.vpn1.nonwildcard
+    uci delete dhcp.tor.boguspriv
+    uci delete dhcp.tor.filterwin2k
+    uci delete dhcp.tor.nonegcache
+    uci delete dhcp.tor.nonwildcard
+    uci set dhcp.tor.rebind_protection=0
+    uci add_list dhcp.tor.server=/onion/172.31.1.1#9053
+    uci delete dhcp.auto.boguspriv
+    uci delete dhcp.auto.filterwin2k
+    uci delete dhcp.auto.nonegcache
+    uci delete dhcp.auto.nonwildcard
+    uci delete dhcp.captive.boguspriv
+    uci delete dhcp.captive.filterwin2k
+    uci delete dhcp.captive.nonegcache
+    uci delete dhcp.captive.nonwildcard
+    uci commit dhcp
+    # dns
+    uci set dns.main=dns
+    uci set dns.main.dns_id=$(uci get wizard.main.dns_id)
+    uci commit dns
+    # luci
+    uci set luci.main.ubuspath='/ubus/'
+    uci set luci.apply.rollback=90
+    uci commit luci
+    # network
+    sed -i "s/vpn_0/vpn_1/g;s/vlan_/eth0_/g;s/switch 'switch0'/switch 'eth0'/;s/local_vpn_traffic/local_vpn1_traffic/" /etc/config/network
+    uci set network.loopback.device=lo
+    uci delete network.loopback.ifname
+    uci set network.br_lan=device
+    uci set network.br_lan.name=br-lan
+    uci set network.br_lan.type=bridge
+    uci add_list network.br_lan.ports=eth0.1
+    uci set network.lan.ifname=
+    uci set network.lan.type=
+    uci set network.lan.device=br-lan
+    uci set network.vpn_1.ifname=tun1
+    uci delete network.eth0
+    uci delete network.eth0_1
+    uci delete network.eth0_2
+    uci set network.vpn1_to_local=route
+    uci set network.vpn1_to_local.interface=loopback
+    uci set network.vpn1_to_local.target=127.0.0.0
+    uci set network.vpn1_to_local.netmask=255.0.0.0
+    uci set network.vpn1_to_local.table=1
+    uci commit network
+    # openvpn
+    sed -i 's/vpn_0/vpn_1/g' /etc/config/openvpn
+    # openvpn
+    mv /etc/openvpn/openvpn_0.conf /etc/openvpn/openvpn_1.conf
+    sed -i 's/tun0/tun1/g' /etc/openvpn/openvpn_1.conf
+    # system
+    uci set system.system.cronloglevel=9
+    uci set system.system.zonename=UTC
+    uci set system.rngd=rngd
+    uci set system.rngd.device=/dev/urandom
+    uci set system.rngd.enabled=1
+    uci delete system.ntp.enable_server
+    uci commit system
+    # ucitrack
+    uci del_list ucitrack.@network[0].affects=radvd
+    uci delete ucitrack.@adblock[0]
+    uci commit ucitrack
+    # vpn
+    sed -i "s/vpn_0/vpn_1/g" /etc/config/vpn
+    uci set vpn.active.provider=${provider_id}
+    uci commit vpn
+    # wireless
+    uci delete wireless.radio0.country
+    uci set wireless.radio0.hwmode=11n
+    uci set wireless.radio0.path=platform/10180000.wmac
+    uci delete wireless.lan.ifname
+    uci commit wireless
+    # wizard
+    rm /etc/config/wizard
+fi

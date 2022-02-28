@@ -4,8 +4,8 @@
      Raises RuntimeError if not found.
      """
      version = ""
--    with open(fname, "r") as fp:
-+    with open(fname, "r", encoding="utf-8") as fp:
+-    with open(fname) as fp:
++    with open(fname, encoding="utf-8") as fp:
          reg = re.compile(r'__version__ = [\'"]([^\'"]*)[\'"]')
          for line in fp:
              m = reg.match(line)

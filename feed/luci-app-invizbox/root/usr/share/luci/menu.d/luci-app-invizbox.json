@@ -1,0 +1,101 @@
+{
+  "admin/invizbox": {
+      "title": "InvizBox",
+      "order": 15,
+      "action": {
+          "type": "view",
+          "path": "invizbox/dns"
+      },
+      "depends": {
+          "acl": [ "luci-app-invizbox" ]
+      }
+  },
+  "admin/invizbox/vpn_location": {
+      "title": "VPN Location",
+      "order": 10,
+      "action": {
+          "type": "view",
+          "path": "invizbox/vpnLocation"
+      }
+  },
+  "admin/invizbox/privacy_mode": {
+      "title": "Privacy Mode",
+      "order": 20,
+      "action": {
+          "type": "view",
+          "path": "invizbox/privacyMode"
+      }
+  },
+  "admin/invizbox/hotspot": {
+      "title": "Hotspot",
+      "order": 30,
+      "action": {
+          "type": "view",
+          "path": "invizbox/hotspot"
+      }
+  },
+  "admin/invizbox/account_details": {
+      "title": "Account Details",
+      "order": 40,
+      "action": {
+          "type": "view",
+          "path": "invizbox/accountDetails"
+      }
+  },
+  "admin/invizbox/dns": {
+      "title": "DNS",
+      "order": 50,
+      "action": {
+          "type": "view",
+          "path": "invizbox/dns"
+      }
+  },
+  "admin/invizbox/tor": {
+      "title": "Tor",
+      "order": 60,
+      "action": {
+          "type": "alias",
+          "path": "admin/invizbox/tor/status"
+      }
+  },
+  "admin/invizbox/tor/status": {
+      "title": "Tor Status",
+      "order": 10,
+      "action": {
+          "type": "view",
+          "path": "invizbox/torStatus"
+      }
+  },
+  "admin/invizbox/tor/bridge_configuration": {
+      "title": "Bridge Configuration",
+      "order": 20,
+      "action": {
+          "type": "view",
+          "path": "invizbox/torBridgeConfiguration"
+      }
+  },
+  "admin/invizbox/tor/proxy_configuration": {
+      "title": "Proxy Configuration",
+      "order": 30,
+      "action": {
+          "type": "view",
+          "path": "invizbox/torProxyConfiguration"
+      }
+  },
+  "admin/invizbox/tor/country_options": {
+      "title": "Country Options",
+      "order": 40,
+      "action": {
+          "type": "view",
+          "path": "invizbox/torCountryOptions"
+      }
+  },
+  "admin/system/logs/update": {
+      "title": "Update Log",
+      "order": 10,
+      "action": {
+          "type": "view",
+          "path": "invizbox/update"
+      }
+  }
+}

@@ -2,7 +2,8 @@
     https://www.invizbox.com/lic/license.txt
 """
 import logging
-from os import path
+from os import path, getenv
+from subprocess import run, PIPE, CalledProcessError
 from json.decoder import JSONDecodeError
 from contextlib import contextmanager
 from bottle_jwt import jwt_auth_required
@@ -11,16 +12,31 @@ from plugins.plugin_jwt import JWT_PLUGIN
 from plugins.plugin_uci import UCI_PLUGIN
 from plugins.uci import UciException
 from utils.validate import validate_option
-import system.vpn as vpn
+from system import vpn
 
 
 ADMIN_PKG = "admin-interface"
+UPDATE_PKG = "update"
+VPN_PKG = "vpn"
 LOGGER = logging.getLogger(__name__)
 
 ADMIN_INTERFACE_APP = Bottle()
 ADMIN_INTERFACE_APP.install(JWT_PLUGIN)
 ADMIN_INTERFACE_APP.install(UCI_PLUGIN)
+ADMIN_INTERFACE_APP.model = getenv("DEVICE_PRODUCT", "InvizBox 2")
 ADMIN_INTERFACE_APP.ping_ready = True
+PROVIDER_NAMES = {
+    "expressvpn": "ExpressVPN",
+    "invizbox": "InvizBox",
+    "ipvanish": "IPVanish",
+    "myexpatnetwork": "MY Expat Network",
+    "nordvpn": "NordVPN",
+    "pia": "PIA",
+    "protonvpn": "ProtonVPN",
+    "surfshark": "Surfshark",
+    "vanishedvpn": "VanishedVPN",
+    "windscribe": "Windscribe",
+}
 
 
 @contextmanager
@@ -29,6 +45,15 @@ def hold_ping():
     ADMIN_INTERFACE_APP.ping_ready = False
     yield
     ADMIN_INTERFACE_APP.ping_ready = True
+
+
+def get_provider_name(provider_id):
+    """ returns the display name for the vpn provider """
+    try:
+        provider_name = PROVIDER_NAMES[provider_id]
+    except KeyError:
+        provider_name = "unknown"
+    return provider_name
 
 
 def validate_ftux(ftux):
@@ -46,14 +71,14 @@ def validate_ftux(ftux):
     return valid
 
 
-def validate_features(features):
-    """ validate the features object """
-    onboarding_needed = True
+def validate_onboarding(onboarding):
+    """ validate the onboarding object """
+    valid = True
     try:
-        onboarding_needed &= validate_option("boolean", features["onboarding"]["needed"])
+        valid &= validate_option("boolean", onboarding["onboarding"]["needed"])
     except (KeyError, TypeError):
-        onboarding_needed = False
-    return onboarding_needed
+        valid = False
+    return valid
 
 
 @ADMIN_INTERFACE_APP.get('/ping')
@@ -95,78 +120,78 @@ def set_ftux(uci):
         return "Error setting ftux in configuration"
 
 
-@ADMIN_INTERFACE_APP.get('/admin_interface/features')
-def get_features(uci):
-    """gets a list of features for the Administration Interface"""
+@ADMIN_INTERFACE_APP.get('/admin_interface/onboarding')
+def get_onboarding(uci):
+    """gets onboarding information for the Administration Interface"""
     try:
         plans = vpn.get_plans(uci)
         try:
-            openvpn_credentials_text = uci.get_option(ADMIN_PKG, "features", "openvpn_credentials_text")
+            provider_id = uci.get_option(VPN_PKG, "active", "provider")
+            provider_name = get_provider_name(provider_id)
         except UciException:
-            openvpn_credentials_text = ''
-        openvpn_credentials_url = uci.get_option(ADMIN_PKG, "features", "openvpn_credentials_url")
+            provider_name = "unknown"
         try:
-            ipsec_credentials_text = uci.get_option(ADMIN_PKG, "features", "ipsec_credentials_text")
+            needed = uci.get_option(ADMIN_PKG, "onboarding", "needed") == "true"
         except UciException:
-            ipsec_credentials_text = ''
-        ipsec_credentials_url = uci.get_option(ADMIN_PKG, "features", "ipsec_credentials_url")
-        onboarding_nedeed = uci.get_option(ADMIN_PKG, "features", "onboarding_needed") == "true"
-        separate_ipsec_credentials = uci.get_option(ADMIN_PKG, "features", "separate_ipsec_credentials") == "true"
-        ipsec_credentials_needed = separate_ipsec_credentials and not path.isfile("/private/ipsec_credentials.txt")
-        vpn_credentials_needed = not path.isfile("/private/vpn_credentials.txt")
+            needed = False
+        if ADMIN_INTERFACE_APP.model == "InvizBox Go":
+            vpn_credentials_needed, ipsec_credentials_needed = False, False
+            try:
+                run(["dd", "if=/dev/mtd2", "bs=1", "skip=65496", "count=24"], stdout=PIPE, stderr=PIPE,
+                    check=False).stdout.decode("utf-8")
+                run(["dd", "if=/dev/mtd2", "bs=1", "skip=65432", "count=64"], stdout=PIPE, stderr=PIPE,
+                    check=False).stdout.decode("utf-8")
+            except (CalledProcessError, UnicodeDecodeError):
+                vpn_credentials_needed = True
+            try:
+                run(["dd", "if=/dev/mtd2", "bs=1", "skip=65408", "count=24"], stdout=PIPE, stderr=PIPE,
+                    check=False).stdout.decode("utf-8")
+                run(["dd", "if=/dev/mtd2", "bs=1", "skip=65244", "count=64"], stdout=PIPE, stderr=PIPE,
+                    check=False).stdout.decode("utf-8")
+            except (CalledProcessError, UnicodeDecodeError):
+                ipsec_credentials_needed = True
+        else:
+            vpn_credentials_needed = not path.isfile("/private/vpn_credentials.txt")
+            ipsec_credentials_needed = not path.isfile("/private/ipsec_credentials.txt")
         try:
-            support_url = uci.get_option(ADMIN_PKG, "features", "support_url")
+            updated_from = uci.get_option(UPDATE_PKG, "version", "updated_from")
         except UciException:
-            support_url = ''
-        try:
-            support_email = uci.get_option(ADMIN_PKG, "features", "support_email")
-        except UciException:
-            support_email = ''
-        vpn_from_account = uci.get_option(ADMIN_PKG, "features", "vpn_from_account") == "true"
-        vpn_status = uci.get_option(ADMIN_PKG, "features", "vpn_status") == "true"
+            updated_from = ""
         return {
             "credentials": {
-                "ipsec": {
-                    "text": ipsec_credentials_text,
-                    "url": ipsec_credentials_url
-                },
-                "openvpn": {
-                    "text": openvpn_credentials_text,
-                    "url": openvpn_credentials_url
-                },
-                "separateIpsecCredentials": separate_ipsec_credentials,
-                "vpnFromAccount": vpn_from_account,
+                "ipsec": ipsec_credentials_needed,
+                "vpn": vpn_credentials_needed
             },
-            'onboarding': {
-                "ipsecCredentials": ipsec_credentials_needed,
-                "needed": onboarding_nedeed,
-                "plans": plans,
-                "vpnCredentials": vpn_credentials_needed
-            },
-            "support": {
-                "url": support_url,
-                "email": support_email
-            },
-            "vpnStatus": vpn_status
+            "model": ADMIN_INTERFACE_APP.model,
+            "needed": needed,
+            "plans": plans,
+            "provider": provider_name,
+            "updatedFrom": updated_from
         }
     except UciException:
         response.status = 400
         return "Error with admin-interface config"
 
 
-@ADMIN_INTERFACE_APP.put('/admin_interface/features')
+@ADMIN_INTERFACE_APP.put('/admin_interface/onboarding')
 @jwt_auth_required
-def set_features(uci):
-    """ updates whether or not the onboarding feature is still needed in the Administration Interface"""
+def set_onboarding(uci):
+    """ updates whether or not onboarding is still needed in the Administration Interface"""
     try:
-        updated_features = dict(request.json)
-        if validate_features(updated_features):
-            onboarding_needed = "true" if updated_features["onboarding"]["needed"] else "false"
-            uci.set_option(ADMIN_PKG, "features", "onboarding_needed", onboarding_needed)
+        updated_onboarding = dict(request.json)
+        if validate_onboarding(updated_onboarding):
+            needed = "true" if updated_onboarding["onboarding"]["needed"] else "false"
+            uci.set_option(ADMIN_PKG, "onboarding", "needed", needed)
             uci.persist(ADMIN_PKG)
-            return updated_features
+            uci.parse(UPDATE_PKG)
+            try:
+                uci.delete_option(UPDATE_PKG, "version", "updated_from")
+                uci.persist(UPDATE_PKG)
+            except UciException:
+                pass
+            return updated_onboarding
         response.status = 400
-        return "Invalid features"
+        return "Invalid onboarding"
     except (JSONDecodeError, KeyError, UciException):
         response.status = 404
         return "Unable to update onboarding in admin-interface"

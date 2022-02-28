@@ -41,7 +41,7 @@ def get_dns_providers(uci):
         dns_uci = uci.get_package(DNS_PKG)
         resolv_servers = []
         try:
-            with open("/tmp/resolv.conf.auto") as resolv_file:
+            with open("/tmp/resolv.conf.d/resolv.conf.auto", encoding="utf-8") as resolv_file:
                 for line in resolv_file.readlines():
                     if line.startswith("nameserver "):
                         resolv_servers.append(line.strip().split()[1])
@@ -84,7 +84,7 @@ def replace_dnsmasq_servers(uci, section, provider_id):
             uci.delete_option(DHCP_PKG, section, "noresolv")
         except UciException:
             pass
-        uci.set_option(DHCP_PKG, section, "resolvfile", "/tmp/resolv.conf.auto")
+        uci.set_option(DHCP_PKG, section, "resolvfile", "/tmp/resolv.conf.d/resolv.conf.auto")
         uci.set_option(DHCP_PKG, section, "server", local_dns_srvs)
     else:
         new_dns_servers = local_dns_srvs + uci.get_option(DNS_PKG, provider_id, "dns_server")

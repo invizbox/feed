@@ -42,8 +42,9 @@ def get_alive_devices(ip_addresses):
     """helper function to check which devices are in fact still connected when their IP is listed in uci"""
     try:
         alive_devices = []
-        process = Popen(["fping", "-4", "-c", "1", "-H", "1", "-r", "1", "-q", "--alive", *ip_addresses], stderr=PIPE)
-        output = process.communicate()[1]
+        with Popen(["fping", "-4", "-c", "1", "-H", "1", "-r", "1", "-q", "--alive", *ip_addresses],
+                   stderr=PIPE) as process:
+            output = process.communicate()[1]
         for line in output.decode('ascii').splitlines():
             if "1/1/0%" in line:
                 alive_devices.append(line.split(" ")[0])

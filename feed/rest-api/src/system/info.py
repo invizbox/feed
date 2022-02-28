@@ -2,6 +2,7 @@
     https://www.invizbox.com/lic/license.txt
 """
 import logging
+from os import getenv
 from subprocess import run, PIPE
 from socket import error, socket, timeout, AF_INET, SOCK_STREAM
 from json.decoder import JSONDecodeError
@@ -22,15 +23,6 @@ INFO_APP = Bottle()
 INFO_APP.install(JWT_PLUGIN)
 INFO_APP.install(UCI_PLUGIN)
 INFO_APP.install(UCI_ROM_PLUGIN)
-
-
-def get_file_info(filename):
-    """helper function to get the value from a file"""
-    try:
-        with open(filename) as my_file:
-            return my_file.readline().rstrip()
-    except FileNotFoundError:
-        return ''
 
 
 def get_uci_info(uci, package, section, option):
@@ -57,14 +49,10 @@ def get_generic_info(uci, uci_rom):
     try:
         ubus_process = run(["ubus", "call", "system", "board"], stdout=PIPE, stderr=PIPE, timeout=5, check=False)
         system_json = json_loads(ubus_process.stdout)
-        mac_address_ethernet = get_file_info("/sys/devices/platform/soc/1c30000.ethernet/net/eth0/address")
-        mac_address_24ghz = get_file_info("/sys/devices/platform/soc"
-                                          "/1c1b000.usb/usb2/2-1/2-1:1.0/ieee80211/phy1/addresses")
-        mac_address_5ghz = get_file_info("/sys/devices/platform/soc"
-                                         "/1c10000.mmc/mmc_host/mmc1/mmc1:0001/mmc1:0001:1/ieee80211/phy0/addresses")
+        model = getenv("DEVICE_PRODUCT", "InvizBox 2")
         try:
             admin_interface_version = ''
-            with open("/usr/lib/opkg/info/admin-interface.control") as admin_interface_file:
+            with open("/usr/lib/opkg/info/admin-interface.control", encoding="utf-8") as admin_interface_file:
                 for line in admin_interface_file.readlines():
                     if line.startswith("Version:"):
                         admin_interface_version = line.strip().split()[1].replace('-', '.')
@@ -75,6 +63,11 @@ def get_generic_info(uci, uci_rom):
         rom_firmware_version = get_uci_info(uci_rom, UPDATE_PKG, "version", "firmware")
         new_firmware_version = get_uci_info(uci, UPDATE_PKG, "version", "new_firmware")
         api_version = get_uci_info(uci, REST_API_PKG, "version", "api")
+        ports = ["LAN"]
+        if model == "InvizBox 2 Pro":
+            ports = ["1", "2", "3", "4"]
+        if model == "InvizBox Go":
+            ports = []
         return {"info": {"currentFirmware": firmware_version,
                          "resetFirmware": rom_firmware_version,
                          "newFirmware": new_firmware_version,
@@ -82,13 +75,8 @@ def get_generic_info(uci, uci_rom):
                          "adminInterface": admin_interface_version,
                          "kernel": system_json["kernel"],
                          "hostName": system_json["hostname"],
-                         "macAddresses": {
-                             "ethernet": mac_address_ethernet,
-                             "wifi24GHz": mac_address_24ghz,
-                             "wifi5GHz": mac_address_5ghz,
-                         },
-                         "model": system_json["model"],
-                         "ports": ["1", "2", "3", "4"] if "Pro" in system_json["model"] else ["LAN"]}}
+                         "model": model,
+                         "ports": ports}}
     except JSONDecodeError:
         response.status = 400
         return "Error getting information"
@@ -143,7 +131,7 @@ def check_file_content(filename, expected_content):
     """helper function to check a file content"""
     correct_content = False
     try:
-        with open(filename, "r") as quick_read_file:
+        with open(filename, "r", encoding="utf-8") as quick_read_file:
             correct_content = quick_read_file.readline().rstrip() == expected_content
     except (FileNotFoundError, IOError):
         pass
@@ -158,7 +146,8 @@ def get_connectivity_info():
         ip_route = run(["ip", "route"], stdout=PIPE, stderr=PIPE, timeout=5, check=False)
         invizbox_ip = next((line.strip().split(' ')[-1] for line in ip_route.stdout.decode('ascii').splitlines()
                             if line.startswith("default")), "")
-        return {"connectivity": {"deviceIp": request.environ.get('REMOTE_ADDR'),
+        return {"connectivity": {"captive": invizbox_ip != "" and check_file_content("/tmp/currently-captive", "true"),
+                                 "deviceIp": request.environ.get('REMOTE_ADDR'),
                                  "invizboxIp": invizbox_ip,
                                  "lan_tor": invizbox_ip != "" and tor_up(),
                                  "lan_vpn1": invizbox_ip != "" and check_file_content("/tmp/openvpn/1/status", "up"),

@@ -3,67 +3,39 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=netwatch
-PKG_VERSION:=2.0
-PKG_RELEASE:=1
-
-PKG_BUILD_DIR:=$(BUILD_DIR)/netwatch
+PKG_VERSION:=3.0
+PKG_RELEASE:=5
 
 include $(INCLUDE_DIR)/package.mk
 
-define Package/netwatch/Default
-	SECTION:=invizbox
-	CATEGORY:=InvizBox
-endef
-
-define Package/netwatch/Default/description
+define Package/$(PKG_NAME)/Default/description
 	Monitors the network to identify changes in available networks/interfaces and modifies routing tables accordingly
 endef
 
-define Package/netwatch-base
-$(call Package/netwatch/Default)
-	DEPENDS:=+invizboxutils +dnsmasq +invizbox-htpdate +openvpn-openssl
-	TITLE:=Network Watcher
+define Package/$(PKG_NAME)
+	SECTION:=invizbox
+	CATEGORY:=InvizBox
+	DEPENDS:=+invizboxutils +dnsmasq +ledcontrol
+	TITLE:=Network Watcher for InvizBox original
 endef
 
-define Package/netwatch-mt7621
-$(call Package/netwatch/Default)
-	TITLE:=netwatch with LED for InvizBox Go
-	DEPENDS:=+netwatch-base +ledcontrol-mt7621
-endef
-
-define Package/netwatch-mt7620
-$(call Package/netwatch/Default)
-	TITLE:=netwatch with LED for InvizBox Go
-	DEPENDS:=+netwatch-base +ledcontrol-mt7620
-endef
-
-define Build/Prepare
-	mkdir -p $(PKG_BUILD_DIR)/src
-	mkdir -p $(PKG_BUILD_DIR)/bin
-	mkdir -p $(PKG_BUILD_DIR)/root
-	$(CP) ./src/* $(PKG_BUILD_DIR)/src/
-	$(CP) ./bin/* $(PKG_BUILD_DIR)/bin/
-	$(CP) ./root/* $(PKG_BUILD_DIR)/root/
+define Package/$(PKG_NAME)/conffiles
+	/etc/config/devices
 endef
 
 define Build/Compile
 endef
 
-define Package/netwatch-base/conffiles
-	/etc/config/netwatch
-	/etc/config/devices
-endef
-
-define Package/netwatch-base/install
+define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/* $(1)/usr/lib/lua/
+	$(INSTALL_BIN) lua/src/* $(1)/usr/lib/lua/
 	$(INSTALL_DIR) $(1)/bin
-	$(CP) $(PKG_BUILD_DIR)/bin/* $(1)/bin/
-	$(INSTALL_DIR) $(1)/
-	$(CP) $(PKG_BUILD_DIR)/root/* $(1)/
+	$(INSTALL_BIN) bin/* $(1)/bin/
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) files/netwatch.init $(1)/etc/init.d/netwatch
 endef
 
-define Package/netwatch-base/preinst
+define Package/$(PKG_NAME)/preinst
 #!/bin/sh
 # check if we are on real system
 if [ -z "$${IPKG_INSTROOT}" ]; then
@@ -72,7 +44,7 @@ fi
 exit 0
 endef
 
-define Package/netwatch-base/postinst
+define Package/$(PKG_NAME)/postinst
 #!/bin/sh
 touch $${IPKG_INSTROOT}/etc/config/devices
 # check if we are on real system
@@ -85,7 +57,7 @@ fi
 exit 0
 endef
 
-define Package/netwatch-base/prerm
+define Package/$(PKG_NAME)/prerm
 #!/bin/sh
 # check if we are on real system
 if [ -z "$${IPKG_INSTROOT}" ]; then
@@ -95,6 +67,4 @@ fi
 exit 0
 endef
 
-$(eval $(call BuildPackage,netwatch-base))
-$(eval $(call BuildPackage,netwatch-mt7620))
-$(eval $(call BuildPackage,netwatch-mt7621))
+$(eval $(call BuildPackage,$(PKG_NAME)))

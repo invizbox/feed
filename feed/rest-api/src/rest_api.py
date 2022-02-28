@@ -7,23 +7,26 @@
 
 import logging.handlers
 from signal import signal, SIGUSR1
-from flup.server.fcgi import WSGIServer
+from threading import Thread
+
 from bottle import Bottle, response
+from flup.server.fcgi import WSGIServer
+
+from admin_interface import ADMIN_INTERFACE_APP
 from auth import AUTH_APP
 from devices import DEVICES_APP
-from admin_interface import ADMIN_INTERFACE_APP
-from internet import INTERNET_APP
 from networks import NETWORKS_APP
 from plugins.plugin_jwt import JWT_PLUGIN
 from plugins.plugin_uci import UCI_PLUGIN
-from profiles import PROFILES_APP
+from profiles import PROFILES_APP, aggregate_loop
 from system.blacklists import BLACKLISTS_APP
 from system.dns import DNS_APP
 from system.firmware import FIRMWARE_APP
 from system.info import INFO_APP
+from system.internet import INTERNET_APP, scan
 from system.logs import LOGS_APP
-from system.ssh_keys import SSH_KEYS_APP
 from system.snapshot import SNAPSHOT_APP
+from system.ssh_keys import SSH_KEYS_APP
 from system.system import SYSTEM_APP
 from system.vpn import VPN_APP
 from users import USERS_APP
@@ -41,6 +44,7 @@ BLACKLISTS_PKG = "blacklists"
 DHCP_PKG = "dhcp"
 UPDATE_PKG = "update"
 VPN_PKG = "vpn"
+WIRELESS_PKG = "wireless"
 
 BOTTLE_APP = Bottle()
 BOTTLE_APP.install(JWT_PLUGIN)
@@ -107,21 +111,31 @@ def explicit_404():
 
 
 def handle_usr1_signal(_signum, _frame):
-    """ handling USR1 - used to reload VPN and udate configurations when modified """
-    LOGGER.info("reloading the admin-interface, blacklists, dhcp, update and vpn configuration as they have been"
-                " updated")
+    """ handling USR1 - used to reload VPN, and update configurations when modified """
+    LOGGER.info("reloading admin-interface, blacklists, dhcp, update, wireless and vpn configuration")
     UCI_PLUGIN.uci.parse(VPN_PKG)
     UCI_PLUGIN.uci.parse(ADMIN_PKG)
     UCI_PLUGIN.uci.parse(BLACKLISTS_PKG)
     UCI_PLUGIN.uci.parse(DHCP_PKG)
     UCI_PLUGIN.uci.parse(UPDATE_PKG)
-    # handle consequences of external changes like blacklists or VPN servers have changed
+    UCI_PLUGIN.uci.parse(WIRELESS_PKG)
+    # handle consequences of external changes like blacklists or VPN servers
     PROFILES_APP.lists_rebuild_flag = True
 
 
-if __name__ == "__main__":
+def main():
+    """ main function """
     # BOTTLE_APP.run(host='127.0.0.1', port=8080, debug=True, reloader=True)
-    PROFILES_APP.aggregate_thread.start()
     LOGGER.info("Starting the REST API Bottle App")
+    initial_scan_thread = Thread(target=scan, daemon=True)
+    initial_scan_thread.start()
+    aggregate_thread = Thread(target=aggregate_loop, args=(UCI_PLUGIN.uci,), daemon=True)
+    aggregate_thread.start()
     signal(SIGUSR1, handle_usr1_signal)
     WSGIServer(BOTTLE_APP, bindAddress="/var/rest-api.fastcgi.py.socket", umask=0o000).run()
+    aggregate_thread.join()
+    LOGGER.info("Stopped the REST API Bottle App")
+
+
+if __name__ == "__main__":
+    main()

@@ -17,14 +17,13 @@ from utils.validate import validate_option
 import networks
 
 LOGGER = logging.getLogger(__name__)
-ADMIN_PKG = "admin-interface"
 IPSEC_PKG = "ipsec"
 UPDATE_PKG = "update"
 VPN_PKG = "vpn"
+PROVIDERS_WITH_SEPARATE_IPSEC_CREDS = ["expressvpn", "windscribe"]
 COUNTRY_TABLE = {
     "Canada East": "CA",
     "Canada West": "CA",
-    "LU": "DE",
     "UK": "GB",
     "US Central": "US",
     "US East": "US",
@@ -82,10 +81,11 @@ def get_locations_protocols(uci):
                         _add_server_id_to_protocol(locations[country][city], protocol, vpn["id"])
                 elif "filename" in vpn:
                     _add_server_id_to_protocol(locations[country][city], "filename", vpn["id"])
-                    protocols["filename"] = {"name": "From OVPN", "vpnProtocol": "OpenVPN"}
+                    protocols["filename"] = {"default": False, "name": "From OVPN", "vpnProtocol": "OpenVPN"}
         elif vpn[".type"] == "protocol":
             protocols[vpn["id"]] = {
                 "vpnProtocol": vpn["vpn_protocol"] if "vpn_protocol" in vpn else "OpenVPN",
+                "default": "default" in vpn and vpn["default"] == "true",
                 "name": vpn["name"] if "name" in vpn else "OpenVPN"
             }
     return locations, protocols
@@ -118,7 +118,7 @@ def get_vpn_account(uci):
     except UciException:
         pass
     try:
-        with open("/etc/openvpn/login.auth", "r") as vpn_credentials_file:
+        with open("/etc/openvpn/login.auth", "r", encoding="utf-8") as vpn_credentials_file:
             openvpn_password = vpn_credentials_file.readlines()[1].rstrip()
     except (IndexError, FileNotFoundError, IOError, StopIteration):
         pass
@@ -137,19 +137,19 @@ def get_vpn_account(uci):
         "renewal": renewal,
         "expiry": expiry
     }
-    if uci.get_option(ADMIN_PKG, "features", "separate_ipsec_credentials") == "true":
-        try:
-            provider_id = uci.get_option(UPDATE_PKG, "urls", "nearest_cities").split('/')[2]
-        except UciException:
-            pass
-        try:
-            account["ipsecUsername"] = uci.get_option(IPSEC_PKG, "vpn_1", "eap_identity")
-            if provider_id == "protonvpn":
-                account["ipsecUsername"] = sub("\\+pib$", "", account["ipsecUsername"])
-            account["ipsecPassword"] = uci.get_option(IPSEC_PKG, "vpn_1", "eap_password")
-        except UciException:
-            account["ipsecUsername"] = ""
-            account["ipsecPassword"] = ""
+    try:
+        provider_id = uci.get_option(VPN_PKG, "active", "provider")
+        if provider_id in PROVIDERS_WITH_SEPARATE_IPSEC_CREDS:
+            try:
+                account["ipsecUsername"] = uci.get_option(IPSEC_PKG, "vpn_1", "eap_identity")
+                if provider_id == "protonvpn":
+                    account["ipsecUsername"] = sub("\\+pib$", "", account["ipsecUsername"])
+                account["ipsecPassword"] = uci.get_option(IPSEC_PKG, "vpn_1", "eap_password")
+            except UciException:
+                account["ipsecUsername"] = ""
+                account["ipsecPassword"] = ""
+    except (IndexError, UciException):
+        pass
     return account
 
 
@@ -179,9 +179,13 @@ def validate_vpn(vpn_json, uci):
     try:
         valid &= validate_option("string", vpn_json["account"]["openvpnUsername"])
         valid &= validate_option("string", vpn_json["account"]["openvpnPassword"])
-        if uci.get_option(ADMIN_PKG, "features", "separate_ipsec_credentials") == "true":
-            valid &= validate_option("string", vpn_json["account"]["ipsecUsername"])
-            valid &= validate_option("string", vpn_json["account"]["ipsecPassword"])
+        try:
+            provider_id = uci.get_option(VPN_PKG, "active", "provider")
+            if provider_id in PROVIDERS_WITH_SEPARATE_IPSEC_CREDS:
+                valid &= validate_option("string", vpn_json["account"]["ipsecUsername"])
+                valid &= validate_option("string", vpn_json["account"]["ipsecPassword"])
+        except UciException:
+            pass
         valid &= validate_option("string", vpn_json["account"]["plan"])
         plans = get_plans(uci)
         if plans:
@@ -195,30 +199,32 @@ def validate_vpn(vpn_json, uci):
 
 def get_similar_location(uci, country, city, new_plan):
     """gets server that is in the same city, same country, nearest city or just plan"""
-    same_city, same_country, nearest, same_plan = [], [], [], []
+    same_city, same_country, nearest, same_plan = [], [], {}, []
     nearest_cities = []
     try:
         nearest_cities = uci.get_option("vpn", "active", "nearest_cities").split(", ")
+        nearest = {nearest_city: [] for nearest_city in nearest_cities}
     except UciException:
         pass
     vpn_uci = uci.get_package(VPN_PKG)
     for vpn in vpn_uci:
-        if vpn[".type"] == "server":
-            if new_plan == "" or ("plan" in vpn and vpn["plan"] == new_plan):
-                same_plan.append(vpn["id"])
-                if vpn["city"] in nearest_cities:
-                    nearest.append(vpn["id"])
-                server_country = COUNTRY_TABLE[vpn["country"]] if vpn["country"] in COUNTRY_TABLE else vpn["country"]
-                if country == server_country and vpn["city"] == city:
-                    same_city.append(vpn["id"])
-                if country == server_country:
-                    same_country.append(vpn["id"])
+        if vpn[".type"] == "server" and (new_plan == "" or ("plan" in vpn and vpn["plan"] == new_plan)):
+            same_plan.append(vpn["id"])
+            for nearest_city in nearest_cities:
+                if vpn["city"] == nearest_city:
+                    nearest[nearest_city].append(vpn["id"])
+            server_country = COUNTRY_TABLE[vpn["country"]] if vpn["country"] in COUNTRY_TABLE else vpn["country"]
+            if country == server_country and vpn["city"] == city:
+                same_city.append(vpn["id"])
+            if country == server_country:
+                same_country.append(vpn["id"])
     if same_city:
         return choice(same_city)
     if same_country:
         return choice(same_country)
-    if nearest:
-        return choice(nearest)
+    for nearest_city in nearest_cities:
+        if nearest[nearest_city]:
+            return choice(nearest[nearest_city])
     if same_plan:
         return choice(same_plan)
     return None
@@ -236,7 +242,7 @@ def update_obsolete_servers(uci, new_plan):
             previous_servers[network_id] = None
     for network_id, server in previous_servers.items():
         new_plan_servers = get_vpn_servers(uci, new_plan)
-        if server["id"] not in new_plan_servers.keys():
+        if server and "id" in server and server["id"] not in new_plan_servers.keys():
             network = networks.get_network(f"lan_vpn{network_id[-1]}", uci)
             if network["name"]:
                 country = COUNTRY_TABLE[server["country"]] if server["country"] in COUNTRY_TABLE else server["country"]
@@ -269,14 +275,14 @@ def set_vpn(uci):
                 response.status = 400
                 return "Error changing plan"
         try:
-            username_tag = ""
-            provider_id = uci.get_option(UPDATE_PKG, "urls", "nearest_cities").split('/')[2]
+            username_tag, provider_id = "", ""
+            provider_id = uci.get_option(VPN_PKG, "active", "provider")
             if provider_id == "protonvpn":
                 username_tag = "+pib"
         except (UciException, IndexError):
             pass
         try:
-            with open("/etc/openvpn/login.auth", "w") as credentials_file:
+            with open("/etc/openvpn/login.auth", "w", encoding="utf-8") as credentials_file:
                 credentials_file.write(f'{vpn_json["account"]["openvpnUsername"]}{username_tag}\n'
                                        f'{vpn_json["account"]["openvpnPassword"]}')
             uci.set_option(VPN_PKG, "active", "username", vpn_json["account"]["openvpnUsername"])
@@ -290,7 +296,7 @@ def set_vpn(uci):
             return "Error writing credentials"
         try:
             for network_id in get_active_servers(uci):
-                if uci.get_option(ADMIN_PKG, "features", "separate_ipsec_credentials") == "true":
+                if provider_id in PROVIDERS_WITH_SEPARATE_IPSEC_CREDS:
                     uci.set_option(IPSEC_PKG, network_id, "eap_identity",
                                    vpn_json["account"]["ipsecUsername"]+username_tag)
                     uci.set_option(IPSEC_PKG, network_id, "eap_password", vpn_json["account"]["ipsecPassword"])

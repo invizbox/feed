@@ -1,0 +1,7 @@
+#!/bin/sh
+while true; do
+	clear
+	echo -e "Every 2 seconds: [$*] \r\t\t\t\t\t\t\t\t\t$(date +%H:%M:%S)\n"
+	$*
+	sleep 2
+done

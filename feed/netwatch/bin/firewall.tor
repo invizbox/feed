@@ -1,7 +1,6 @@
-device_ip=$(uci get network.lan.ipaddr)
 iptables -t nat -I PREROUTING -p udp -m multiport --dports 3478,19302 -m comment --comment "!fw3" -j REDIRECT --to-ports 9999
 iptables -t nat -I PREROUTING -p udp -m multiport --sports 3478,19302 -m comment --comment "!fw3" -j REDIRECT --to-ports 9999
-iptables -t nat -I PREROUTING -s ${device_ip}/24 ! -d ${device_ip}/32 -p tcp --syn -m comment --comment "!fw3" -j DNAT --to-destination 172.31.1.1:9040
+iptables -t nat -I PREROUTING -s 10.101.0.1/24 ! -d 10.101.0.1/32 -p tcp --syn -m comment --comment "!fw3" -j DNAT --to-destination 172.31.1.1:9040
 iptables -t nat -I OUTPUT -d 10.192.0.0/16 -p tcp --syn -m comment --comment "!fw3" -j DNAT --to-destination 172.31.1.1:9040
 iptables -I FORWARD -p tcp -m comment --comment "!fw3" -j REJECT --reject-with tcp-reset
 iptables -D FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "!fw3" -j ACCEPT

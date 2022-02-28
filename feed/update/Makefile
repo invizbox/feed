@@ -7,14 +7,12 @@ PKG_NAME:=update
 PKG_VERSION:=$(VERSION_NUMBER)
 PKG_RELEASE:=1
 
-PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
-
 include $(INCLUDE_DIR)/package.mk
 
 define Package/$(PKG_NAME)
 	SECTION:=invizbox
 	CATEGORY:=InvizBox
-	DEPENDS:=+unzip +invizboxutils +tor
+	DEPENDS:=+unzip +invizboxutils +tor-basic
 	TITLE:=VPN configs, IPKs and firmware updater
 endef
 
@@ -26,28 +24,19 @@ define Package/$(PKG_NAME)/conffiles
 /etc/config/update
 endef
 
-define Build/Prepare
-	mkdir -p $(PKG_BUILD_DIR)/bin
-	mkdir -p $(PKG_BUILD_DIR)/src
-	mkdir -p $(PKG_BUILD_DIR)/root
-	$(CP) ./bin/* $(PKG_BUILD_DIR)/bin/
-	$(CP) ./src/* $(PKG_BUILD_DIR)/src/
-	$(CP) ./root/* $(PKG_BUILD_DIR)/root/
-endef
-
 define Build/Compile
 endef
 
 define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/* $(1)/usr/lib/lua/
+	$(INSTALL_BIN) lua/src/* $(1)/usr/lib/lua/
 	$(INSTALL_DIR) $(1)/bin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/* $(1)/bin/
+	$(INSTALL_BIN) bin/* $(1)/bin/
 	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) $(PKG_BUILD_DIR)/root/etc/config/update $(1)/etc/config
+	$(INSTALL_CONF) files/update.config $(1)/etc/config/update
 	$(SED) 's,%V,$(VERSION_NUMBER),g' $(1)/etc/config/update
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/root/etc/uci-defaults/98_update $(1)/etc/uci-defaults/98_update
+	$(INSTALL_BIN) uci-defaults/98_update $(1)/etc/uci-defaults/
 	$(SED) 's,%V,$(VERSION_NUMBER),g' $(1)/etc/uci-defaults/98_update
 endef
 

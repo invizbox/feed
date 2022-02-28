@@ -9,19 +9,20 @@
 #        https://www.invizbox.com/lic/license.txt
 
 . /lib/functions.sh
-function version { printf "%03d%03d%03d" $(echo "$1" | tr '.' ' '); }
+. /bin/invizboxutils.sh
 
 pre_update_version=$(uci get update.version.firmware)
-provider=$(uci get update.urls.nearest_cities | cut -d '/' -f 3)
-if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
+provider_id=$(uci get vpn.active.provider)
+
+if [ "$(version "${pre_update_version}")" -lt "$(version 0.0.41)" ]; then
     uci set admin-interface.features=service
-    if [ -z $(uci get admin-interface.features.onboarding_needed) ]; then
-        local feature
+    if [ -z "$(uci get admin-interface.features.onboarding_needed)" ]; then
+    	feature="true"
         config_load admin-interface
         config_get feature onboarding needed "true"
         uci set admin-interface.features.onboarding_needed=$feature
     fi
-    if [ "${provider}" == "expressvpn" ]; then
+    if [ "${provider_id}" == "expressvpn" ]; then
         uci set admin-interface.features.ipsec_credentials_url='https://www.expressvpn.com/setup#manual'
         uci set admin-interface.features.openvpn_credentials_url='https://www.expressvpn.com/setup#manual'
         uci set admin-interface.features.separate_ipsec_credentials='false'
@@ -33,7 +34,7 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
         uci set admin-interface.lan_vpn2.protocol_id=openvpn_udp_1195
         uci set admin-interface.lan_vpn3.protocol_id=openvpn_udp_1195
         uci set admin-interface.lan_vpn4.protocol_id=openvpn_udp_1195
-    elif [ "${provider}" == "invizbox" ]; then
+    elif [ "${provider_id}" == "invizbox" ]; then
         uci set admin-interface.features.ipsec_credentials_url='https://shop.invizbox.com/dashboard/vpn-account'
         uci set admin-interface.features.openvpn_credentials_url='https://shop.invizbox.com/dashboard/vpn-account'
         uci set admin-interface.features.separate_ipsec_credentials='false'
@@ -45,7 +46,7 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
         uci set admin-interface.lan_vpn2.protocol_id=openvpn_tcp_443
         uci set admin-interface.lan_vpn3.protocol_id=openvpn_tcp_443
         uci set admin-interface.lan_vpn4.protocol_id=openvpn_tcp_443
-    elif [ "${provider}" == "ipvanish" ]; then
+    elif [ "${provider_id}" == "ipvanish" ]; then
         uci set admin-interface.features.ipsec_credentials_url='https://account.ipvanish.com'
         uci set admin-interface.features.openvpn_credentials_url='https://account.ipvanish.com'
         uci set admin-interface.features.separate_ipsec_credentials='false'
@@ -57,7 +58,7 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
         uci set admin-interface.lan_vpn2.protocol_id=openvpn_tcp_443
         uci set admin-interface.lan_vpn3.protocol_id=openvpn_tcp_443
         uci set admin-interface.lan_vpn4.protocol_id=openvpn_tcp_443
-    elif [ "${provider}" == "nordvpn" ]; then
+    elif [ "${provider_id}" == "nordvpn" ]; then
         uci set admin-interface.features.ipsec_credentials_url='https://ucp.nordvpn.com/dashboard'
         uci set admin-interface.features.openvpn_credentials_url='https://ucp.nordvpn.com/dashboard'
         uci set admin-interface.features.separate_ipsec_credentials='false'
@@ -69,7 +70,7 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
         uci set admin-interface.lan_vpn2.protocol_id=openvpn_tcp_443
         uci set admin-interface.lan_vpn3.protocol_id=openvpn_tcp_443
         uci set admin-interface.lan_vpn4.protocol_id=openvpn_tcp_443
-    elif [ "${provider}" == "pia" ]; then
+    elif [ "${provider_id}" == "pia" ]; then
         uci set admin-interface.features.ipsec_credentials_url='https://www.privateinternetaccess.com/pages/client-control-panel'
         uci set admin-interface.features.openvpn_credentials_url='https://www.privateinternetaccess.com/pages/client-control-panel'
         uci set admin-interface.features.separate_ipsec_credentials='false'
@@ -81,7 +82,7 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
         uci set admin-interface.lan_vpn2.protocol_id=openvpn_tcp_501
         uci set admin-interface.lan_vpn3.protocol_id=openvpn_tcp_501
         uci set admin-interface.lan_vpn4.protocol_id=openvpn_tcp_501
-    elif [ "${provider}" == "vanishedvpn" ]; then
+    elif [ "${provider_id}" == "vanishedvpn" ]; then
         uci set admin-interface.features.ipsec_credentials_url='https://www.vanishedvpn.com/my-account'
         uci set admin-interface.features.openvpn_credentials_url='https://www.vanishedvpn.com/my-account'
         uci set admin-interface.features.separate_ipsec_credentials='false'
@@ -93,7 +94,7 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
         uci set admin-interface.lan_vpn2.protocol_id=openvpn_udp_1194
         uci set admin-interface.lan_vpn3.protocol_id=openvpn_udp_1194
         uci set admin-interface.lan_vpn4.protocol_id=openvpn_udp_1194
-    elif [ "${provider}" == "windscribe" ]; then
+    elif [ "${provider_id}" == "windscribe" ]; then
         uci set admin-interface.features.openvpn_credentials_url='https://windscribe.com/getconfig/openvpn'
         uci set admin-interface.features.separate_ipsec_credentials='true'
         uci set admin-interface.features.support_email=''
@@ -107,34 +108,34 @@ if [ $(version ${pre_update_version}) -lt $(version 0.0.41) ]; then
     fi
     uci commit admin-interface
 fi
-if [ $(version ${pre_update_version}) -lt $(version 0.1.0) ]; then
-    if [ "${provider}" == "expressvpn" ]; then
+if [ "$(version "${pre_update_version}")" -lt "$(version 0.1.0)" ]; then
+    if [ "${provider_id}" == "expressvpn" ]; then
         uci set admin-interface.features.separate_ipsec_credentials='true'
         uci set admin-interface.features.ipsec_credentials_text='Click the "PPTP & L2TP/IPsec" button'
         uci set admin-interface.features.openvpn_credentials_text='Click the "OpenVPN" button'
-    elif [ "${provider}" == "invizbox" ]; then
+    elif [ "${provider_id}" == "invizbox" ]; then
         uci set admin-interface.features.ipsec_credentials_text='In the VPN Account section, click the "View VPN Password button"'
         uci set admin-interface.features.openvpn_credentials_text='In the VPN Account section, click the "View VPN Password button"'
-    elif [ "${provider}" == "ipvanish" ]; then
+    elif [ "${provider_id}" == "ipvanish" ]; then
         uci set admin-interface.features.ipsec_credentials_text=''
         uci set admin-interface.features.openvpn_credentials_text=''
-    elif [ "${provider}" == "nordvpn" ]; then
+    elif [ "${provider_id}" == "nordvpn" ]; then
         uci set admin-interface.features.ipsec_credentials_text=''
         uci set admin-interface.features.openvpn_credentials_text=''
-    elif [ "${provider}" == "pia" ]; then
+    elif [ "${provider_id}" == "pia" ]; then
         uci set admin-interface.features.ipsec_credentials_text=''
         uci set admin-interface.features.openvpn_credentials_text=''
-    elif [ "${provider}" == "vanishedvpn" ]; then
+    elif [ "${provider_id}" == "vanishedvpn" ]; then
         uci set admin-interface.features.ipsec_credentials_text=''
         uci set admin-interface.features.openvpn_credentials_text=''
-    elif [ "${provider}" == "windscribe" ]; then
+    elif [ "${provider_id}" == "windscribe" ]; then
         uci set admin-interface.features.ipsec_credentials_url='https://windscribe.com/getconfig/ikev2'
         uci set admin-interface.features.ipsec_credentials_text='Select any location, click on "Get Profile Details" and use the username and password'
         uci set admin-interface.features.openvpn_credentials_text='Click on "Get Credentials" and use the username and password'
     fi
     uci commit admin-interface
 fi
-if [ $(version ${pre_update_version}) -lt $(version 0.1.5) ]; then
+if [ "$(version "${pre_update_version}")" -lt "$(version 0.1.5)" ]; then
     uci set admin-interface.lan_vpn1.protocol_id="$(uci -d '-' get admin-interface.lan_vpn1.protocol_id | cut -d '-' -f 1)"
     uci set admin-interface.lan_vpn2.protocol_id="$(uci -d '-' get admin-interface.lan_vpn2.protocol_id | cut -d '-' -f 1)"
     uci set admin-interface.lan_vpn3.protocol_id="$(uci -d '-' get admin-interface.lan_vpn3.protocol_id | cut -d '-' -f 1)"
@@ -143,5 +144,22 @@ if [ $(version ${pre_update_version}) -lt $(version 0.1.5) ]; then
     uci set admin-interface.lan_clear2.dns_id="dhcp"
     uci set admin-interface.invizbox=local_network
     uci set admin-interface.invizbox.dns_id="dhcp"
+    uci commit admin-interface
+fi
+if [ "$(version "${pre_update_version}")" -lt "$(version 0.1.9)" ]; then
+    uci set admin-interface.onboarding=service
+    uci set admin-interface.onboarding.needed="$(uci get admin-interface.features.onboarding_needed)"
+    uci commit admin-interface
+fi
+if [ "$(version "${pre_update_version}")" -lt "$(version 4.1.3)" ]; then
+    uci del admin-interface.features
+    uci del admin-interface.lan_vpn1.blacklist
+    uci del admin-interface.lan_vpn2.blacklist
+    uci del admin-interface.lan_vpn3.blacklist
+    uci del admin-interface.lan_vpn4.blacklist
+    uci del admin-interface.lan_tor.blacklist
+    uci del admin-interface.lan_clear1.blacklist
+    uci del admin-interface.lan_clear2.blacklist
+    uci del admin-interface.lan_local.blacklist
     uci commit admin-interface
 fi

@@ -3,11 +3,11 @@
 
     Implementing an authentication backend for bottle-jwt
 """
-from os import environ
+from os import getenv
 from bottle_jwt import JWTProviderPlugin, BaseAuthBackend
 from plugins.plugin_uci import UCI_PLUGIN
 
-JWT_SECRET = environ.get('JWT_SECRET', 'invizbox_jwt_secret')
+JWT_SECRET = getenv("JWT_SECRET", "invizbox_jwt_secret")
 REST_API_PKG = "rest-api"
 
 
@@ -21,13 +21,12 @@ class IB2Backend(BaseAuthBackend):
         users_uci = self.uci.get_package(REST_API_PKG)
         return_user = None
         for user in users_uci:
-            if "password" not in user:
-                user["password"] = ""
-            if user[".type"] == "user" and user["name"] == username and user["password"] == password:
+            user_password = "" if "password" not in user else user["password"]
+            if user[".type"] == "user" and user["name"] == username and user_password == password:
                 return_user = {
                     'id': int(user["id"]),
                     'username': user["name"],
-                    'password': user["password"]
+                    'password': password
                 }
         return return_user
 

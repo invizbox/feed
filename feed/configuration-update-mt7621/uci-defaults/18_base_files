@@ -1,0 +1,445 @@
+#!/bin/ash
+
+# Copyright 2020 InvizBox Ltd
+#
+# Licensed under the InvizBox Shared License;
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#        https://www.invizbox.com/lic/license.txt
+
+. /lib/functions.sh
+. /bin/invizboxutils.sh
+
+pre_update_version=$(uci get update.version.firmware)
+provider_id=$(uci get vpn.active.provider)
+
+if [ "$(version "${pre_update_version}")" -lt "$(version 4.0.13)" ]; then
+    # firewall
+    uci set firewall.user_include=include
+    uci set firewall.user_include.enabled=1
+    uci set firewall.user_include.path=/bin/firewall.no_network
+    uci set firewall.user_include.reload=1
+    uci commit firewall
+
+    # network
+    uci del network.globals
+    uci rename network.vpn=vpn_0
+    uci set network.local_vpn_traffic=route
+    uci set network.local_vpn_traffic.interface=lan
+    uci set network.local_vpn_traffic.target=10.153.146.0
+    uci set network.local_vpn_traffic.netmask=255.255.255.0
+    uci set network.local_vpn_traffic.gateway=0.0.0.0
+    uci set network.local_vpn_traffic.table=1
+    uci commit network
+
+    # openvpn
+    uci rename openvpn.vpn=vpn_0
+    uci set openvpn.vpn_0.config=/etc/openvpn/openvpn_0.conf
+    mv /etc/openvpn/openvpn.conf /etc/openvpn/openvpn_0.conf
+    uci commit openvpn
+    sed -i "s/auth-nocache/auth-nocache\nscript-security 2\nroute-noexec\nroute-up \/bin\/route_up.ash\nroute-pre-down \/bin\/route_pre_down.ash/g" /etc/openvpn/openvpn_0.conf
+    sed -i "s/auth-nocache/auth-nocache\nscript-security 2\nroute-noexec\nroute-up \/bin\/route_up.ash\nroute-pre-down \/bin\/route_pre_down.ash/g" /etc/openvpn/templates/*
+
+    # dhcp
+    uci set dhcp.invizbox.leasefile=/tmp/dhcp.leases
+    uci rename dhcp.vpn=vpn0
+    uci del dhcp.vpn0.rebind_domain
+    uci add_list dhcp.tor.server=/onion/172.31.1.1#9053
+    uci set dhcp.lan.disabled=0
+    uci set dhcp.lan.force=1
+    uci set dhcp.lan.instance=auto
+    uci commit dhcp
+
+    # wizard
+    uci set wizard.main.dns_id=dhcp
+    uci set wizard.main.manual_captive_mode=0
+    uci set wizard.main.status="Default State"
+    uci commit wizard
+
+    # vpn
+    first_template=$(grep -m1 "option template" /etc/config/vpn | awk '{print $3}' | cut -d "'" -f 2)
+    sed -i "s/\toption template/\tlist protocol_id 'openvpn_tcp_443'\n\toption template/g" /etc/config/vpn
+    sed -i "/option template/d" /etc/config/vpn
+    uci set vpn.active.protocol_id=openvpn_tcp_443
+    uci rename vpn.active.vpn=vpn_0
+    uci set vpn.openvpn_tcp_443=protocol
+    for server in $(uci get dhcp.vpn0.server); do
+        case "$server" in
+            *@tun0) uci add_list vpn.openvpn_tcp_443.dns_server="${server::-5}" ;;
+        esac
+    done
+    uci set vpn.openvpn_tcp_443.name="OpenVPN over TCP port 443"
+    uci set vpn.openvpn_tcp_443.template="$first_template"
+    uci set vpn.openvpn_tcp_443.vpn_protocol=OpenVPN
+    uci commit vpn
+fi
+if [ "$(version "${pre_update_version}")" -lt "$(version 4.1.3)" ]; then
+    # adblock
+    if [ "$(uci -q get adblock.global.adb_enabled)" == "1" ]; then
+        sed -i '/siteBlocking/,/deviceAccess/ s/false/true/;s/Ids\": \[\]/Ids\": \["ad_malware"\]/' /etc/profiles.json
+        cat /etc/dns_blacklist/ad_malware > /etc/dns_blacklist/lan_vpn1.overall
+    fi
+    rm /etc/config/adblock
+    rm -rf /etc/adblock
+    # admin-interface
+    uci set admin-interface.invizbox.dns_id=$(uci get wizard.main.dns_id)
+    rm /etc/config/wizard
+    uci set admin-interface.lan_vpn1.name=$(uci get wireless.lan.ssid)
+    uci set admin-interface.lan_vpn1.protocol_id=$(uci get vpn.active.protocol_id)
+    uci commit admin-interface
+    # crontab
+    echo "*/5 * * * * /usr/sbin/logrotate /etc/logrotate.conf" >>/etc/crontabs/root
+    echo "* * * * * /bin/ipsec_keepalive.sh" >>/etc/crontabs/root
+    # dhcp
+    sed -i "s/vpn0/vpn1/;s/tun0/tun1/;s/auto/clear1/;s/dhcp 'lan'/dhcp 'lan_vpn1'/" /etc/config/dhcp
+    sed -i 's|/tmp/resolv.conf.auto|/tmp/resolv.conf.d/resolv.conf.auto|' /etc/config/dhcp
+    uci delete dhcp.invizbox.boguspriv
+    uci delete dhcp.invizbox.filterwin2k
+    uci delete dhcp.invizbox.leasefile
+    uci delete dhcp.invizbox.nonegcache
+    uci delete dhcp.invizbox.nonwildcard
+    uci add_list dhcp.invizbox.rebind_domain=vpn1
+    uci add_list dhcp.invizbox.rebind_domain=tor
+    uci add_list dhcp.invizbox.rebind_domain=clear1
+    uci delete dhcp.invizbox.rebind_protection
+    uci add_list dhcp.invizbox.server=/vpn1/10.153.146.1
+    uci add_list dhcp.invizbox.server=/tor/10.153.147.1
+    uci add_list dhcp.invizbox.server=/clear1/10.153.148.1
+    uci delete dhcp.invizbox.serversfile
+    uci delete dhcp.vpn1.boguspriv
+    uci set dhcp.vpn1.disabled=0
+    uci set dhcp.vpn1.domain=vpn1
+    uci delete dhcp.vpn1.filterwin2k
+    uci del_list dhcp.vpn1.interface=lan
+    uci add_list dhcp.vpn1.interface=lan_vpn1
+    uci set dhcp.vpn1.leasefile=/tmp/dhcp.leases.vpn1
+    uci set dhcp.vpn1.local=/vpn1/
+    uci delete dhcp.vpn1.localuse
+    uci delete dhcp.vpn1.nonegcache
+    uci delete dhcp.vpn1.nonwildcard
+    uci add_list dhcp.vpn1.rebind_domain=tor
+    uci add_list dhcp.vpn1.rebind_domain=clear1
+    uci delete dhcp.vpn1.rebind_protection
+    uci add_list dhcp.vpn1.server=/tor/10.153.147.1
+    uci add_list dhcp.vpn1.server=/clear1/10.153.148.1
+    uci set dhcp.vpn1.serversfile=/etc/dns_blacklist/lan_vpn1.overall
+    uci delete dhcp.tor.boguspriv
+    uci set dhcp.tor.disabled=1
+    uci set dhcp.tor.domain=tor
+    uci delete dhcp.tor.filterwin2k
+    uci del_list dhcp.tor.interface=lan
+    uci add_list dhcp.tor.interface=lan_tor
+    uci set dhcp.tor.leasefile=/tmp/dhcp.leases.tor
+    uci set dhcp.tor.local=/tor/
+    uci delete dhcp.tor.localuse
+    uci delete dhcp.tor.nonegcache
+    uci delete dhcp.tor.nonwildcard
+    uci del_list dhcp.tor.rebind_domain=onion
+    uci add_list dhcp.tor.rebind_domain=vpn1
+    uci add_list dhcp.tor.rebind_domain=clear1
+    uci delete dhcp.tor.rebind_protection
+    uci del_list dhcp.tor.server=/onion/172.31.1.1#9053
+    uci add_list dhcp.tor.server=/vpn1/10.153.146.1
+    uci add_list dhcp.tor.server=/clear1/10.153.148.1
+    uci set dhcp.tor.serversfile=/etc/dns_blacklist/lan_tor.overall
+    uci delete dhcp.clear1.boguspriv
+    uci set dhcp.clear1.disabled=1
+    uci set dhcp.clear1.domain=clear1
+    uci delete dhcp.clear1.filterwin2k
+    uci del_list dhcp.clear1.interface=lan
+    uci add_list dhcp.clear1.interface=lan_clear1
+    uci set dhcp.clear1.leasefile=/tmp/dhcp.leases.clear1
+    uci set dhcp.clear1.local=/clear1/
+    uci delete dhcp.clear1.nonegcache
+    uci delete dhcp.clear1.nonwildcard
+    uci add_list dhcp.clear1.rebind_domain=vpn1
+    uci add_list dhcp.clear1.rebind_domain=tor
+    uci delete dhcp.clear1.rebind_protection
+    uci add_list dhcp.clear1.server=/vpn1/10.153.146.1
+    uci add_list dhcp.clear1.server=/tor/10.153.147.1
+    uci set dhcp.clear1.serversfile=/etc/dns_blacklist/lan_clear1.overall
+    uci delete dhcp.captive.address
+    uci delete dhcp.captive.boguspriv
+    uci delete dhcp.captive.dhcpscript
+    uci set dhcp.captive.disabled=0
+    uci delete dhcp.captive.domain
+    uci delete dhcp.captive.filterwin2k
+    uci delete dhcp.captive.interface
+    uci delete dhcp.captive.leasefile
+    uci delete dhcp.captive.local
+    uci delete dhcp.captive.nonegcache
+    uci delete dhcp.captive.nonwildcard
+    uci set dhcp.captive.noresolv=0
+    uci delete dhcp.captive.notinterface
+    uci set dhcp.captive.port=54
+    uci delete dhcp.captive.rebind_localhost
+    uci set dhcp.captive.rebind_protection=0
+    uci set dhcp.captive.resolvfile=/tmp/resolv.conf.d/resolv.conf.auto
+    uci add_list dhcp.captive.server=/vpn1/10.153.146.1
+    uci add_list dhcp.captive.server=/tor/10.153.147.1
+    uci add_list dhcp.captive.server=/clear1/10.153.148.1
+    uci delete dhcp.captive.serversfile
+    uci add_list dhcp.lan_vpn1.dhcp_option="option:classless-static-route,0.0.0.0/0,10.153.146.1,10.153.146.0/22,10.153.146.1"
+    uci add_list dhcp.lan_vpn1.dhcp_option="option:domain-search,tor,clear1"
+    uci set dhcp.lan_vpn1.disabled=0
+    uci set dhcp.lan_vpn1.instance=vpn1
+    uci set dhcp.lan_vpn1.interface=lan_vpn1
+    uci set dhcp.lan_vpn1.start=2
+    uci set dhcp.lan_tor=dhcp
+    uci add_list dhcp.lan_tor.dhcp_option="option:classless-static-route,0.0.0.0/0,10.153.147.1,10.153.146.0/22,10.153.147.1"
+    uci add_list dhcp.lan_tor.dhcp_option="option:domain-search,vpn1,clear1"
+    uci set dhcp.lan_tor.disabled=1
+    uci set dhcp.lan_tor.force=1
+    uci set dhcp.lan_tor.instance=tor
+    uci set dhcp.lan_tor.interface=lan_tor
+    uci set dhcp.lan_tor.leasetime=10m
+    uci set dhcp.lan_tor.limit=251
+    uci set dhcp.lan_tor.start=2
+    uci set dhcp.lan_clear1=dhcp
+    uci add_list dhcp.lan_clear1.dhcp_option="option:classless-static-route,0.0.0.0/0,10.153.148.1,10.153.146.0/22,10.153.148.1"
+    uci add_list dhcp.lan_clear1.dhcp_option="option:domain-search,vpn1,tor"
+    uci set dhcp.lan_clear1.disabled=1
+    uci set dhcp.lan_clear1.force=1
+    uci set dhcp.lan_clear1.instance=clear1
+    uci set dhcp.lan_clear1.interface=lan_clear1
+    uci set dhcp.lan_clear1.leasetime=10m
+    uci set dhcp.lan_clear1.limit=251
+    uci set dhcp.lan_clear1.start=2
+    uci commit dhcp
+    # dropbear
+    dropear_instance=$(uci get dropbear.@dropbear[0])
+    uci delete dropbear.@dropbear[0]
+    uci set dropbear.lan_vpn1=dropbear
+    uci set dropbear.lan_vpn1.Interface=lan_vpn1
+    uci set dropbear.lan_vpn1.PasswordAuth=on
+    uci set dropbear.lan_vpn1.Port=22
+    uci set dropbear.lan_vpn1.RootPasswordAuth=on
+    uci set dropbear.lan_vpn1.enable=0
+    uci set dropbear.lan_tor=dropbear
+    uci set dropbear.lan_tor.Interface=lan_tor
+    uci set dropbear.lan_tor.PasswordAuth=on
+    uci set dropbear.lan_tor.Port=22
+    uci set dropbear.lan_tor.RootPasswordAuth=on
+    uci set dropbear.lan_tor.enable=0
+    uci set dropbear.lan_clear1=dropbear
+    uci set dropbear.lan_clear1.Interface=lan_clear1
+    uci set dropbear.lan_clear1.PasswordAuth=on
+    uci set dropbear.lan_clear1.Port=22
+    uci set dropbear.lan_clear1.RootPasswordAuth=on
+    uci set dropbear.lan_clear1.enable=0
+    if [ "${dropear_instance}" == "dropbear" ]; then
+        sed -i '/ssh/,/deviceBlocking/ s/false/true/' /etc/profiles.json
+        uci set dropbear.lan_vpn1.enable=1
+    fi
+    uci commit dropbear
+    # firewall
+    sed -i -e "s/dhcp/dhcp_renew/;s/zone 'wan'/zone 'wan_zone'/;s/zone 'lan'/zone 'vpn1_zone'/;s/config redirect/config redirect 'dns_vpn1'/" /etc/config/firewall
+    uci set firewall.conntrack_all=rule
+    uci set firewall.conntrack_all.src=lan_all
+    uci set firewall.conntrack_all.dest=lan_all
+    uci set firewall.conntrack_all.extra='-m conntrack --ctstate NEW'
+    uci set firewall.conntrack_all.proto=all
+    uci set firewall.conntrack_all.target=ACCEPT
+    uci reorder firewall.conntrack_all=2
+    uci set firewall.all_to_vpn1=rule
+    uci set firewall.all_to_vpn1.src=lan_all
+    uci set firewall.all_to_vpn1.dest=lan_vpn1
+    uci set firewall.all_to_vpn1.mark=1
+    uci set firewall.all_to_vpn1.proto=all
+    uci set firewall.all_to_vpn1.target=ACCEPT
+    uci reorder firewall.all_to_vpn1=3
+    uci set firewall.vpn1_to_all=rule
+    uci set firewall.vpn1_to_all.src=lan_vpn1
+    uci set firewall.vpn1_to_all.dest=lan_all
+    uci set firewall.vpn1_to_all.mark=1
+    uci set firewall.vpn1_to_all.proto=all
+    uci set firewall.vpn1_to_all.target=ACCEPT
+    uci reorder firewall.vpn1_to_all=4
+    uci set firewall.all_to_tor=rule
+    uci set firewall.all_to_tor.src=lan_all
+    uci set firewall.all_to_tor.dest=lan_tor
+    uci set firewall.all_to_tor.mark=16
+    uci set firewall.all_to_tor.proto=all
+    uci set firewall.all_to_tor.target=ACCEPT
+    uci reorder firewall.all_to_tor=5
+    uci set firewall.tor_to_all=rule
+    uci set firewall.tor_to_all.src=lan_tor
+    uci set firewall.tor_to_all.dest=lan_all
+    uci set firewall.tor_to_all.mark=16
+    uci set firewall.tor_to_all.proto=all
+    uci set firewall.tor_to_all.target=ACCEPT
+    uci reorder firewall.tor_to_all=6
+    uci set firewall.all_to_clear1=rule
+    uci set firewall.all_to_clear1.src=lan_all
+    uci set firewall.all_to_clear1.dest=lan_clear1
+    uci set firewall.all_to_clear1.mark=32
+    uci set firewall.all_to_clear1.proto=all
+    uci set firewall.all_to_clear1.target=ACCEPT
+    uci reorder firewall.all_to_clear1=7
+    uci set firewall.clear1_to_all=rule
+    uci set firewall.clear1_to_all.src=lan_clear1
+    uci set firewall.clear1_to_all.dest=lan_all
+    uci set firewall.clear1_to_all.mark=32
+    uci set firewall.clear1_to_all.proto=all
+    uci set firewall.clear1_to_all.target=ACCEPT
+    uci reorder firewall.clear1_to_all=8
+    uci set firewall.tunnels_zone=zone
+    uci set firewall.tunnels_zone.mtu_fix=1
+    uci set firewall.tunnels_zone.name=tunnels
+    uci add_list firewall.tunnels_zone.network=vpn_1
+    uci set firewall.vpn1_zone.name=lan_vpn1
+    uci delete firewall.vpn1_zone.network
+    uci set firewall.vpn1_zone.network=lan_vpn1
+    uci set firewall.tor_zone=zone
+    uci set firewall.tor_zone.input=ACCEPT
+    uci set firewall.tor_zone.name=lan_tor
+    uci set firewall.tor_zone.network=lan_tor
+    uci set firewall.clear1_zone=zone
+    uci set firewall.clear1_zone.input=ACCEPT
+    uci set firewall.clear1_zone.name=lan_clear1
+    uci set firewall.clear1_zone.network=lan_clear1
+    uci set firewall.all_zone=zone
+    uci set firewall.all_zone.input=ACCEPT
+    uci set firewall.all_zone.name=lan_all
+    uci add_list firewall.all_zone.network=lan_vpn1
+    uci add_list firewall.all_zone.network=lan_tor
+    uci add_list firewall.all_zone.network=lan_clear1
+    uci set firewall.dns_vpn1.src=lan_vpn1
+    uci set firewall.dns_tor=redirect
+    uci set firewall.dns_tor.dest_ip=10.153.147.1
+    uci set firewall.dns_tor.dest_port=53
+    uci set firewall.dns_tor.src=lan_tor
+    uci set firewall.dns_tor.src_dport=53
+    uci set firewall.dns_tor.target=DNAT
+    uci set firewall.dns_clear1=redirect
+    uci set firewall.dns_clear1.dest_ip=10.153.148.1
+    uci set firewall.dns_clear1.dest_port=53
+    uci set firewall.dns_clear1.src=lan_clear1
+    uci set firewall.dns_clear1.src_dport=53
+    uci set firewall.dns_clear1.target=DNAT
+    uci set firewall.user_include.path=/etc/firewall.user
+    uci commit firewall
+    # fstab
+    uci rename fstab.@global[0]=global
+    uci set fstab.global.anon_mount=1
+    uci commit fstab
+    # luci
+    rm /etc/config/luci
+    rm /etc/config/luci-opkg
+    rm /etc/config/rpcd
+    rm /etc/config/ucitrack
+    rm /etc/config/ucitrack-opkg
+    rm /etc/config/uhttpd
+    rm /etc/config/update-opkg
+    # network
+    sed -i -e "s/interface 'lan'/interface 'lan_vpn1'/;s/vpn_0/vpn_1/;s/tun0/tun1/;s/local_vpn_traffic/local_vpn1_traffic/" /etc/config/network
+    uci set network.globals=globals
+    uci set network.globals.packet_steering=1
+    uci set network.loopback.device=lo
+    uci delete network.loopback.ifname
+    uci set network.br_lan_vpn1=device
+    uci set network.br_lan_vpn1.name=br-lan_vpn1
+    uci set network.br_lan_vpn1.type=bridge
+    uci delete network.lan_vpn1.type
+    uci set network.lan_vpn1.device=br-lan_vpn1
+    uci set network.br_lan_tor=device
+    uci set network.br_lan_tor.name=br-lan_tor
+    uci set network.br_lan_tor.type=bridge
+    uci set network.lan_tor=interface
+    uci set network.lan_tor.device=br-lan_tor
+    uci set network.lan_tor.ipaddr=10.153.147.1
+    uci set network.lan_tor.netmask=255.255.255.0
+    uci set network.lan_tor.proto=static
+    uci set network.br_lan_clear1=device
+    uci set network.br_lan_clear1.name=br-lan_clear1
+    uci set network.br_lan_clear1.type=bridge
+    uci set network.lan_clear1=interface
+    uci set network.lan_clear1.device=br-lan_clear1
+    uci set network.lan_clear1.ipaddr=10.153.148.1
+    uci set network.lan_clear1.netmask=255.255.255.0
+    uci set network.lan_clear1.proto=static
+    uci delete network.switch0
+    uci delete network.vlan_1
+    uci delete network.vlan_2
+    uci set network.vpn1_lookup_1=rule
+    uci set network.vpn1_lookup_1.in=lan_vpn1
+    uci set network.vpn1_lookup_1.lookup=1
+    uci set network.vpn1_to_local=route
+    uci set network.vpn1_to_local.interface=loopback
+    uci set network.vpn1_to_local.target=127.0.0.0
+    uci set network.vpn1_to_local.netmask=255.0.0.0
+    uci set network.vpn1_to_local.table=1
+    uci set network.local_vpn1_traffic.interface=lan_vpn1
+    uci set network.tor_to_vpn1=route
+    uci set network.tor_to_vpn1.gateway=0.0.0.0
+    uci set network.tor_to_vpn1.interface=lan_tor
+    uci set network.tor_to_vpn1.netmask=255.255.255.0
+    uci set network.tor_to_vpn1.table=1
+    uci set network.tor_to_vpn1.target=10.153.147.0
+    uci set network.clear1_to_vpn1=route
+    uci set network.clear1_to_vpn1.gateway=0.0.0.0
+    uci set network.clear1_to_vpn1.interface=lan_clear1
+    uci set network.clear1_to_vpn1.netmask=255.255.255.0
+    uci set network.clear1_to_vpn1.table=1
+    uci set network.clear1_to_vpn1.target=10.153.148.0
+    uci commit network
+    # openvpn
+    sed -i 's/vpn_0/vpn_1/g' /etc/config/openvpn
+    # system
+    uci set system.system.cronloglevel=9
+    uci set system.system.zonename=UTC
+    uci set system.rngd=rngd
+    uci set system.rngd.device=/dev/urandom
+    uci set system.rngd.enabled=1
+    uci delete system.ntp.enable_server
+    uci set system.green.sysfs=green:wifi
+    uci set system.red.sysfs=red:wifi
+    uci commit system
+    # vpn
+    uci delete vpn.active.mode
+    uci delete vpn.active.protocol_id
+    uci set vpn.active.vpn_1=$(uci get vpn.active.vpn_0)
+    uci delete vpn.active.vpn_0
+    uci commit vpn
+    # wireless
+    wan_disabled=$(uci get wireless.wan.disabled)
+    lan_key=$(uci get wireless.lan.key)
+    uci set wireless.radio0.hwmode=11n
+    uci set wireless.radio0.path=1e140000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0
+    uci delete wireless.wan.ifname
+    if [ "${wan_disabled}" == "1" ]; then
+        uci set wireless.wan.mode="scan"
+    fi
+    uci set wireless.lan.disabled=0
+    uci delete wireless.lan.ifname
+    uci set wireless.lan.network=lan_vpn1
+    uci set wireless.ap_tor=wifi-iface
+    uci set wireless.ap_tor.device=radio0
+    uci set wireless.ap_tor.disabled=1
+    uci set wireless.ap_tor.encryption=psk-mixed
+    uci set wireless.ap_tor.key=${lan_key}
+    uci set wireless.ap_tor.mode=ap
+    uci set wireless.ap_tor.network=lan_tor
+    uci set wireless.ap_tor.ssid=''
+    uci set wireless.ap_clear1=wifi-iface
+    uci set wireless.ap_clear1.device=radio0
+    uci set wireless.ap_clear1.disabled=1
+    uci set wireless.ap_clear1.encryption=psk-mixed
+    uci set wireless.ap_clear1.key=${lan_key}
+    uci set wireless.ap_clear1.mode=ap
+    uci set wireless.ap_clear1.network=lan_clear1
+    uci set wireless.ap_clear1.ssid=''
+    uci commit wireless
+    # rest-api
+    uci set rest-api.1.password=${lan_key}
+    uci commit rest-api
+    # openvpn
+    mv /etc/openvpn/openvpn_0.conf /etc/openvpn/openvpn_1.conf
+    sed -i 's/tun0/tun1/g' /etc/openvpn/openvpn_1.conf
+    uci set openvpn.vpn_1.enabled=1
+    uci commit openvpn
+    # trigger luci interface redirect
+    mkdir -p /www/luci-static/resources/icons
+    ln -s /www/favicon.ico /www/luci-static/resources/icons/loading.gif
+fi
