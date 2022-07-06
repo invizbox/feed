@@ -25,7 +25,7 @@ SYSTEM_APP.install(UCI_PLUGIN)
 @SYSTEM_APP.get('/system/reboot')
 @jwt_auth_required
 def reboot():
-    """reboots the device"""
+    """Reboot the device"""
     LOGGER.warning("Rebooting.")
     ADMIN_INTERFACE_APP.ping_ready = False
     system(". /bin/ledcontrol.ash; led_restarting")
@@ -35,7 +35,7 @@ def reboot():
 @SYSTEM_APP.get('/system/reset')
 @jwt_auth_required
 def reset():
-    """resets the device"""
+    """Reset the device"""
     LOGGER.warning("Resetting to first boot.")
     ADMIN_INTERFACE_APP.ping_ready = False
     system(". /bin/ledcontrol.ash; led_restarting")
@@ -46,14 +46,14 @@ def reset():
 @SYSTEM_APP.post('/system/check_for_updates')
 @jwt_auth_required
 def check_for_updates():
-    """runs a check for updates"""
+    """Run a check for updates"""
     system("/usr/lib/lua/update.lua &")
 
 
 @SYSTEM_APP.get('/system/check_for_updates')
 @jwt_auth_required
 def checking_for_updates():
-    """returns whether the InvizBox 2 is checking for updates"""
+    """Whether the InvizBox 2 is checking for updates"""
     checking = True
     if system("lock -n /var/lock/update.lock") == 0:
         checking = False
@@ -64,7 +64,7 @@ def checking_for_updates():
 @SYSTEM_APP.get('/system/timezone')
 @jwt_auth_required
 def get_timezone(uci):
-    """resets the device"""
+    """Reset the device"""
     try:
         current_timezone = uci.get_option(SYSTEM_PKG, "system", "zonename")
         return {"current": current_timezone.replace(' ', '_'),
@@ -75,7 +75,7 @@ def get_timezone(uci):
 
 
 def validate_timezone(updated_timezone):
-    """ validate a timezone """
+    """Validate a timezone"""
     valid = True
     try:
         valid &= validate_option("string", updated_timezone["current"])
@@ -87,7 +87,7 @@ def validate_timezone(updated_timezone):
 @SYSTEM_APP.put('/system/timezone')
 @jwt_auth_required
 def set_timezone(uci):
-    """sets the device timezone"""
+    """Set the device timezone"""
     try:
         updated_timezone = dict(request.json)
         if validate_timezone(updated_timezone) and updated_timezone["current"] in TZ_DATA:
@@ -104,7 +104,7 @@ def set_timezone(uci):
 
 
 def validate_led(updated_led):
-    """ validate an LED setting """
+    """Validate an LED setting"""
     valid = True
     try:
         valid &= validate_option("string", updated_led["status"])

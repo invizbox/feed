@@ -921,4 +921,14 @@ fi
 if [ "$(version "${pre_update_version}")" -lt "$(version 4.1.13)" ]; then
     # ipsec
     rm /etc/strongswan.d/charon.conf
+    # system
+    uci set system.system.ttylogin=1
+    uci commit system
+fi
+if [ "$(version "${pre_update_version}")" -lt "$(version 4.2.2)" ]; then
+    # vpn
+    if [ "$(uci get vpn.active.plan)" == "Basic" ]; then
+        uci set vpn.active.plan="Plus/Visionary"
+        uci commit vpn
+    fi
 fi

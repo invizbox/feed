@@ -57,7 +57,7 @@ PROFILES_APP.lock = Lock()
 
 
 def validate_profile(updated_profile, uci):
-    """validate the JSON structure of an updated profile"""
+    """Validate the JSON structure of an updated profile"""
     valid = True
     try:
         valid &= validate_option("string", updated_profile["name"])
@@ -103,7 +103,7 @@ def validate_profile(updated_profile, uci):
 
 
 def persist_profiles():
-    """ persist the profiles to file """
+    """Persist the profiles to file"""
     try:
         with open(PROFILES_APP.file, "w", encoding="utf-8") as profiles_file:
             try:
@@ -117,7 +117,7 @@ def persist_profiles():
 @PROFILES_APP.get('/profiles')
 @jwt_auth_required
 def get_profiles():
-    """ list the profiles """
+    """List the profiles"""
     if not PROFILES_APP.profiles:
         try:
             with open(PROFILES_APP.file, "r", encoding="utf-8") as profiles_file:
@@ -133,7 +133,7 @@ def get_profiles():
 @PROFILES_APP.get('/profiles/<profile_id>')
 @jwt_auth_required
 def get_profile(profile_id):
-    """ list the profiles """
+    """List the profiles"""
     try:
         profiles = get_profiles()
         profile = next(profile for profile in profiles["profiles"] if profile["id"] == profile_id)
@@ -146,7 +146,7 @@ def get_profile(profile_id):
 @PROFILES_APP.post('/profiles')
 @jwt_auth_required
 def create_profile(uci):
-    """ creates a new profile """
+    """Create a new profile"""
     try:
         profile = dict(request.json)
         if not validate_profile(profile, uci):
@@ -175,7 +175,7 @@ def create_profile(uci):
 @PROFILES_APP.delete('/profiles/<profile_id>')
 @jwt_auth_required
 def delete_profile(profile_id, uci):
-    """ delete a specific profile """
+    """Delete a specific profile"""
     profiles = get_profiles()
     try:
         profile = next(profile for profile in profiles["profiles"] if profile["id"] == profile_id)
@@ -200,7 +200,7 @@ def delete_profile(profile_id, uci):
 
 
 def create_blocking_rule(uci, network_id, mac_address, rule):
-    """helper function to create a firewall rule linked to a device"""
+    """Helper function to create a firewall rule linked to a device"""
     firewall_uci = uci.get_package(FIREWALL_PKG)
     zone = next(zone for zone in firewall_uci if zone[".type"] == "zone" and zone["network"] == network_id)
     new_rule = {".type": "rule",
@@ -220,7 +220,7 @@ def create_blocking_rule(uci, network_id, mac_address, rule):
 
 
 def create_device_access_rule(uci, network_id, mac_address):
-    """ helper function to create a device access rule firewall rule """
+    """Helper function to create a device access rule firewall rule"""
     device_access_rule = {".type": "rule",
                           "dest": "lan_all",
                           "id": uuid4().hex,
@@ -233,7 +233,7 @@ def create_device_access_rule(uci, network_id, mac_address):
 
 
 def rebuild_site_blocking(uci, network_id, profile):
-    """ helper function to rebuild the Site Blocking for a specific network """
+    """Helper function to rebuild the Site Blocking for a specific network"""
     with PROFILES_APP.lock:
         if profile["siteBlocking"]["enabled"]:
             user_list_file = f"/etc/dns_blacklist/{network_id}.blacklist"
@@ -260,7 +260,7 @@ def rebuild_site_blocking(uci, network_id, profile):
 
 
 def update_profile_network(uci, network_id, current_profile, new_profile):
-    """ helper function which will change from the current profile to the new profile for a specific network """
+    """Helper function which will change from the current profile to the new profile for a specific network"""
     reload_dropbear, reload_firewall = (False, False)
     if new_profile["ssh"] != current_profile["ssh"]:
         uci.set_option(SSH_PKG, network_id, "enable", "1" if new_profile["ssh"]["enabled"] else "0")
@@ -296,7 +296,7 @@ def update_profile_network(uci, network_id, current_profile, new_profile):
 @PROFILES_APP.put('/profiles/<profile_id>')
 @jwt_auth_required
 def update_profile(profile_id, uci):
-    """ update a specific profile """
+    """Update a specific profile"""
     try:
         profiles = get_profiles()
         profile = next(profile for profile in profiles["profiles"] if profile["id"] == profile_id)
@@ -332,7 +332,7 @@ def update_profile(profile_id, uci):
 
 
 def delete_device_from_profiles(device_id):
-    """ helper function to delete all references to a device in profiles"""
+    """Helper function to delete all references to a device in profiles"""
     for profile in get_profiles()["profiles"]:
         try:
             del profile["deviceBlocking"]["deviceRules"][device_id]
@@ -343,7 +343,7 @@ def delete_device_from_profiles(device_id):
 
 
 def aggregate_loop(uci):
-    """loop to check if the flag to update DNS lists is raised and do it if so"""
+    """Loop to check if the flag to update DNS lists is raised and do it if so"""
     while True:
         sleep(10)
         if PROFILES_APP.lists_rebuild_flag:

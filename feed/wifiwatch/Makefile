@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=wifiwatch
 PKG_VERSION:=1.6
-PKG_RELEASE:=10
+PKG_RELEASE:=11
 
 include $(INCLUDE_DIR)/package.mk
 

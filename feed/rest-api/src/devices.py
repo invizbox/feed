@@ -22,7 +22,7 @@ DEVICES_APP.install(UCI_PLUGIN)
 
 
 def validate_device(device, new=False):
-    """ validate a device """
+    """Validate a device"""
     valid = True
     try:
         valid &= validate_option("string", device["name"])
@@ -39,7 +39,7 @@ def validate_device(device, new=False):
 
 
 def get_alive_devices(ip_addresses):
-    """helper function to check which devices are in fact still connected when their IP is listed in uci"""
+    """Helper function to check which devices are in fact still connected when their IP is listed in uci"""
     try:
         alive_devices = []
         with Popen(["fping", "-4", "-c", "1", "-H", "1", "-r", "1", "-q", "--alive", *ip_addresses],
@@ -54,7 +54,7 @@ def get_alive_devices(ip_addresses):
 
 
 def get_devices(uci, include_ips=False):
-    """" helper function to get all information related to devices from UCI """
+    """"Helper function to get all information related to devices from UCI"""
     uci.parse(DEVICE_PKG)
     devices_uci = uci.get_package(DEVICE_PKG)
     if include_ips:
@@ -79,7 +79,7 @@ def get_devices(uci, include_ips=False):
 @DEVICES_APP.get('/devices')
 @jwt_auth_required
 def list_devices(uci):
-    """ list known devices """
+    """List known devices"""
     try:
         return {"devices": get_devices(uci, True)}
     except UciException:
@@ -90,7 +90,7 @@ def list_devices(uci):
 @DEVICES_APP.get('/devices/<device_id>')
 @jwt_auth_required
 def get_device(device_id, uci):
-    """ list a specific device """
+    """List a specific device"""
     LOGGER.debug("get_device() called")
     try:
         devices = get_devices(uci, True)
@@ -104,7 +104,7 @@ def get_device(device_id, uci):
 @DEVICES_APP.post('/devices')
 @jwt_auth_required
 def create_device(uci):
-    """ create a new device """
+    """Create a new device"""
     try:
         device = dict(request.json)
         if not validate_device(device, True):
@@ -141,7 +141,7 @@ def create_device(uci):
 @DEVICES_APP.delete('/devices/<device_id>')
 @jwt_auth_required
 def delete_device(device_id, uci):
-    """ delete a specific device """
+    """Delete a specific device"""
     LOGGER.debug("delete_device() called")
     try:
         devices = get_devices(uci)
@@ -169,7 +169,7 @@ def delete_device(device_id, uci):
 @DEVICES_APP.put('/devices/<device_id>')
 @jwt_auth_required
 def update_device(device_id, uci):
-    """ update a specific device """
+    """Update a specific device"""
     LOGGER.debug("update_device() called")
     try:
         devices = get_devices(uci, True)

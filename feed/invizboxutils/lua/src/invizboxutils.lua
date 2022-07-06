@@ -395,6 +395,7 @@ function invizboxutils.apply_vpn_config(some_uci, vpn_interface, tun_name)
         some_uci:commit("openvpn")
         some_uci:save("wireguard")
         some_uci:commit("wireguard")
+        os.execute("sync")
         return true
     else
         return false, 2

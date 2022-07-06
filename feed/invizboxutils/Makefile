@@ -5,7 +5,7 @@ include $(INCLUDE_DIR)/version.mk
 
 PKG_NAME:=invizboxutils
 PKG_VERSION:=3.0
-PKG_RELEASE:=12
+PKG_RELEASE:=16
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -32,6 +32,8 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_BIN) src/*.sh src/*.ash src/watch $(1)/bin/
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) src/15_defaultpassword $(1)/etc/uci-defaults/
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_BIN) src/clean_delta_files $(1)/etc/init.d/
 endef
 
 $(eval $(call BuildPackage,$(PKG_NAME)))

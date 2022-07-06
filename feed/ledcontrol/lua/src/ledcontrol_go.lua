@@ -10,6 +10,7 @@ local led = {}
 function led.uci_commit_reload()
     uci:save("system")
     uci:commit("system")
+    os.execute("sync")
     os.execute("rm /var/run/led.state") -- avoid flash
     os.execute("/etc/init.d/led reload")
 end
@@ -68,6 +69,7 @@ function led._orange_flashing()
     uci:set("system", "green", "trigger", "heartbeat")
     uci:save("system")
     uci:commit("system")
+    os.execute("sync")
     os.execute("/etc/init.d/led reload")
     utils.log("LED going orange flashing")
 end

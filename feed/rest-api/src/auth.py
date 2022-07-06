@@ -25,7 +25,7 @@ AUTH_APP.install(UCI_PLUGIN)
 
 
 def get_identifier():
-    """returns the unique identifier for the InvizBox"""
+    """Get the unique identifier for the InvizBox"""
     try:
         radio_path = UCI_PLUGIN.uci.get_option(WIRELESS_PKG, "radio0", "path")
         mac_file_path = glob(f"/sys/devices/{radio_path}/ieee80211/phy*/macaddress")[0]
@@ -79,8 +79,7 @@ def access_token(uci):
                          and token["ua_family"] == (ua_dict["device"]["family"] or "Other")
                          and token["ua_model"] == (ua_dict["device"]["model"] or "Other")
                          and token["ua_os"] == (ua_dict["os"]["family"] or "Other")
-                         and token["ua_agent"] == (ua_dict["user_agent"]["family"] or "Other")
-                         and (device_id is None or token["device_id"] == "" or token["device_id"] == device_id))
+                         and token["ua_agent"] == (ua_dict["user_agent"]["family"] or "Other"))
         except StopIteration:
             response.status = 400
             return "Error validating the refresh token"
@@ -103,7 +102,7 @@ def access_token(uci):
 @AUTH_APP.get("/auth/refresh_tokens")
 @jwt_auth_required
 def get_refresh_tokens(uci):
-    """Provides a list of token ID, User Agents, Devices pairs for which a refresh token was issued"""
+    """Get a list of token ID, User Agents, Devices pairs for which a refresh token was issued"""
     try:
         token_uci = uci.get_package(REST_API_PKG)
         tokens = [{"id": token["id"],

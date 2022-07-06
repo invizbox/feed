@@ -36,14 +36,14 @@ VPN_APP.install(UCI_PLUGIN)
 
 
 def _add_server_id_to_protocol(locations, protocol_id, server_id):
-    """helper function to simplify the next function"""
+    """Helper function to simplify the next function"""
     if protocol_id not in locations:
         locations[protocol_id] = []
     locations[protocol_id].append(server_id)
 
 
 def get_plans(uci):
-    """helper function to get a list of VPN plans"""
+    """Helper function to get a list of VPN plans"""
     vpn_uci = uci.get_package(VPN_PKG)
     plans = set()
     for vpn in vpn_uci:
@@ -53,13 +53,13 @@ def get_plans(uci):
 
 
 def get_active_servers(uci):
-    """helper function to get a list of active servers"""
+    """Helper function to get a list of active servers"""
     active_config = uci.get_config(VPN_PKG, "active")
     return [option for option, _ in active_config.items() if option.startswith("vpn_")]
 
 
 def get_locations_protocols(uci):
-    """helper function to get a list of VPN locations and protocols"""
+    """Helper function to get a list of VPN locations and protocols"""
     vpn_uci = uci.get_package(VPN_PKG)
     locations = {}
     protocols = {}
@@ -92,7 +92,7 @@ def get_locations_protocols(uci):
 
 
 def get_vpn_servers(uci, plan):
-    """gets the VPN servers names and addresses"""
+    """Get the VPN servers names and addresses"""
     try:
         vpn_uci = uci.get_package(VPN_PKG)
         servers = {}
@@ -110,7 +110,7 @@ def get_vpn_servers(uci, plan):
 
 
 def get_vpn_account(uci):
-    """gets the VPN credentials and account status (helper)"""
+    """Get the VPN credentials and account status (helper)"""
     openvpn_username, openvpn_password = ("", "")
     registered, renewal, expiry = ("unknown", "unknown", "unknown")
     try:
@@ -156,7 +156,7 @@ def get_vpn_account(uci):
 @VPN_APP.get('/system/vpn')
 @jwt_auth_required
 def get_vpn(uci):
-    """gets the VPN credentials, account status and available locations"""
+    """Get the VPN credentials, account status and available locations"""
     try:
         account = get_vpn_account(uci)
         locations, protocols = get_locations_protocols(uci)
@@ -174,7 +174,7 @@ def get_vpn(uci):
 
 
 def validate_vpn(vpn_json, uci):
-    """ validate VPN credentials and plan """
+    """Validate VPN credentials and plan"""
     valid = True
     try:
         valid &= validate_option("string", vpn_json["account"]["openvpnUsername"])
@@ -198,7 +198,7 @@ def validate_vpn(vpn_json, uci):
 
 
 def get_similar_location(uci, country, city, new_plan):
-    """gets server that is in the same city, same country, nearest city or just plan"""
+    """Get server that is in the same city, same country, nearest city or just plan"""
     same_city, same_country, nearest, same_plan = [], [], {}, []
     nearest_cities = []
     try:
@@ -231,7 +231,7 @@ def get_similar_location(uci, country, city, new_plan):
 
 
 def update_obsolete_servers(uci, new_plan):
-    """ set servers matching the users new plan """
+    """Set servers matching the users new plan"""
     restart = False
     previous_servers = {}
     for network_id in get_active_servers(uci):
@@ -242,7 +242,7 @@ def update_obsolete_servers(uci, new_plan):
             previous_servers[network_id] = None
     for network_id, server in previous_servers.items():
         new_plan_servers = get_vpn_servers(uci, new_plan)
-        if server and "id" in server and server["id"] not in new_plan_servers.keys():
+        if server and "id" in server and server["id"] not in new_plan_servers:
             network = networks.get_network(f"lan_vpn{network_id[-1]}", uci)
             if network["name"]:
                 country = COUNTRY_TABLE[server["country"]] if server["country"] in COUNTRY_TABLE else server["country"]
@@ -256,7 +256,7 @@ def update_obsolete_servers(uci, new_plan):
 @VPN_APP.put('/system/vpn')
 @jwt_auth_required
 def set_vpn(uci):
-    """sets the VPN credentials and plan"""
+    """Set the VPN credentials and plan"""
     try:
         vpn_json = dict(request.json)
         if not validate_vpn(vpn_json, uci):

@@ -9,16 +9,16 @@ from utils.validate import validate_option
 
 
 class UciException(Exception):
-    """ Exception wrapper for simplicity """
+    """Exception wrapper for simplicity"""
 
 
 def uci_characters(raw_string):
-    """ simple removal of non uci friendly characters """
+    """Simple removal of non uci friendly characters"""
     return sub('[^a-zA-Z0-9_]+', '', raw_string)
 
 
 class Uci:
-    """ Handling UCI interactions """
+    """Handling UCI interactions"""
 
     def __init__(self, config_directory):
         self.config_dir = config_directory
@@ -32,7 +32,7 @@ class Uci:
 
     @staticmethod
     def uci_cleanup(entry):
-        """ helper function to cleanup an entry based on the quoting and escaping rules in UCI """
+        """Helper function to cleanup an entry based on the quoting and escaping rules in UCI"""
         entry = entry.strip()
         if entry.startswith("'") and entry.endswith("'"):
             entry = entry[1:-1].replace("'\\''", "'")
@@ -42,7 +42,7 @@ class Uci:
 
     @staticmethod
     def option_parse(option):  # pylint: disable=too-many-branches
-        """ helper function to parse an option value as per UCI (without multiline support)"""
+        """Helper function to parse an option value as per UCI (without multiline support)"""
         single_quoted = False
         double_quoted = False
         escaped = False
@@ -86,7 +86,7 @@ class Uci:
         return final_option
 
     def parse(self, package="*"):
-        """ Parsing UCI config files into a dictionary """
+        """Parsing UCI config files into a dictionary"""
         for config_file_name in glob(self.config_dir + "/" + package):
             package_config = []
             option_config = {}
@@ -104,7 +104,7 @@ class Uci:
                     if pattern:
                         list_name = self.uci_cleanup(pattern.group(1))
                         list_value = self.option_parse(pattern.group(2))
-                        if list_name not in option_config.keys():
+                        if list_name not in option_config:
                             option_config[list_name] = [list_value]
                         else:
                             option_config[list_name].append(list_value)
@@ -134,7 +134,7 @@ class Uci:
 
     @staticmethod
     def build_option_string(config, ):
-        """ builds up a string to represent a config in UCI format """
+        """Build up a string to represent a config in UCI format"""
         if config['id']:
             show_string = f"config {config['.type']} '{config['id']}'\n"
         else:
@@ -151,7 +151,7 @@ class Uci:
         return show_string
 
     def show_package(self, package, print_it=False):
-        """ shows a package configuration in a file compatible structure """
+        """Show a package configuration in a file compatible structure"""
         show_string = f"package {package}\n"
         try:
             for config in self.uci_config[package]:
@@ -163,7 +163,7 @@ class Uci:
             raise UciException("Invalid Package") from None
 
     def show_config(self, package, config, print_it=False):
-        """ shows a config configuration item by ID in a file compatible structure """
+        """Show a config configuration item by ID in a file compatible structure"""
         current_package = self.uci_config[package]
         config = next(opt for opt in current_package if opt["id"] == config)
         show_string = self.build_option_string(config)
@@ -172,7 +172,7 @@ class Uci:
         return show_string
 
     def get_package(self, package):
-        """ get full package"""
+        """Get full package"""
         try:
             current_package = self.uci_config[package]
             return current_package
@@ -180,7 +180,7 @@ class Uci:
             raise UciException("Invalid package") from None
 
     def get_config(self, package, config):
-        """ get full config """
+        """Get full config"""
         try:
             current_package = self.uci_config[package]
             current_config = next(opt for opt in current_package if opt["id"] == config)
@@ -191,7 +191,7 @@ class Uci:
             raise UciException("Invalid config") from None
 
     def add_config(self, package, config):
-        """ add a new config """
+        """Add a new config"""
         try:
             current_package = self.uci_config[package]
             current_package.append(config)
@@ -199,7 +199,7 @@ class Uci:
             raise UciException("Invalid package") from None
 
     def delete_config(self, package, config):
-        """ remove a config by id """
+        """Remove a config by id"""
         try:
             current_package = self.uci_config[package]
             self.uci_config[package] = [opt for opt in current_package if opt["id"] != config]
@@ -207,7 +207,7 @@ class Uci:
             raise UciException("Invalid package") from None
 
     def get_option(self, package, config, option):
-        """ get value in memory """
+        """Get value in memory"""
         try:
             current_package = self.uci_config[package]
             current_config = next(opt for opt in current_package if opt["id"] == config)
@@ -221,7 +221,7 @@ class Uci:
             raise UciException("Invalid option") from None
 
     def set_option(self, package, config, option, value):
-        """ change a value in memory """
+        """Change a value in memory"""
         if not validate_option("string", option):
             raise UciException("Invalid option")
         if not validate_option("string", value) and not validate_option("string_list", value):
@@ -236,7 +236,7 @@ class Uci:
         current_config[option] = value
 
     def delete_option(self, package, config, option):
-        """ remove an option """
+        """Remove an option"""
         try:
             current_package = self.uci_config[package]
             current_config = next(opt for opt in current_package if opt["id"] == config)
@@ -250,7 +250,7 @@ class Uci:
             raise UciException("Invalid option") from None
 
     def persist(self, package):
-        """ Persists to disc the current representation of a UCI package """
+        """Persist to disc the current representation of a UCI package"""
         try:
             new_content = self.show_package(package)
             with open(f"{self.config_dir}/{package}", 'w', encoding="utf-8") as config_handle:

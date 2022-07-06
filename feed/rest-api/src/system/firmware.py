@@ -25,7 +25,7 @@ CHUNK_SIZE = 65536
 @FIRMWARE_APP.post('/system/firmware/upload')
 @jwt_auth_required
 def upload_firmware():
-    """upload the firmware file and report SHA256"""
+    """Upload the firmware file and report SHA256"""
     upload = request.files.get('file')  # pylint: disable=no-member
     _, extension = splitext(upload.filename)
     if extension != '.bin':
@@ -57,7 +57,7 @@ def upload_firmware():
 @FIRMWARE_APP.post('/system/firmware/flash')
 @jwt_auth_required
 def flash_firmware():
-    """flash the previously uploaded firmware"""
+    """Flash the previously uploaded firmware"""
     try:
         json_content = dict(request.json)
         if not json_content:
@@ -91,7 +91,7 @@ def flash_firmware():
 @FIRMWARE_APP.post('/system/firmware/flash_new')
 @jwt_auth_required
 def flash_new_firmware():
-    """flash the firmware downloaded by the update process (see newFirmware in /system/info/generic)"""
+    """Flash the firmware downloaded by the update process (see newFirmware in /system/info/generic)"""
     try:
         json_content = dict(request.json)
         if not json_content:

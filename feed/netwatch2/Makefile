@@ -4,7 +4,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=netwatch2
 PKG_VERSION:=1.1
-PKG_RELEASE:=10
+PKG_RELEASE:=14
 
 include $(INCLUDE_DIR)/package.mk
 

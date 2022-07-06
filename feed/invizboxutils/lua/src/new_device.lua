@@ -11,6 +11,7 @@
 
 local utils = require("invizboxutils")
 local uci = require("uci").cursor()
+local os = require("os")
 
 local function add_device(section_name, mac_address, ip_address, name)
     local config_name = "devices"
@@ -25,6 +26,7 @@ local function add_device(section_name, mac_address, ip_address, name)
     uci:set(config_name, section_name, "hostname", name)
     uci:save(config_name)
     uci:commit(config_name)
+    os.execute("sync")
 end
 
 local function remove_ip(section_name)
@@ -33,6 +35,7 @@ local function remove_ip(section_name)
     uci:delete(config_name, section_name, "ip_address")
     uci:save(config_name)
     uci:commit(config_name)
+    os.execute("sync")
 end
 
 local mac_address = utils.uci_characters(arg[2]) or ""

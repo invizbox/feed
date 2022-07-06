@@ -30,6 +30,7 @@ function netwatch.set_dnsmasq_uci(option_name)
     uci:set("dhcp", "lan", "instance", option_name)
     uci:save("dhcp")
     uci:commit("dhcp")
+    os.execute("sync")
     os.execute("/etc/init.d/dnsmasq reload")
 end
 
@@ -39,6 +40,7 @@ function netwatch.reset_iptables(firewall_script)
     uci:set("firewall", "user_include", "path", "/bin/"..firewall_script)
     uci:save("firewall")
     uci:commit("firewall")
+    os.execute("sync")
     os.execute("/etc/init.d/firewall reload")
 end
 

@@ -22,7 +22,7 @@ DNS_APP.install(UCI_PLUGIN)
 
 
 def validate_dns_provider(dns_provider, uci):
-    """validate a DNS Provider ID"""
+    """Validate a DNS Provider ID"""
     valid = True
     try:
         valid &= validate_option("string", dns_provider["dnsProviderId"])
@@ -36,7 +36,7 @@ def validate_dns_provider(dns_provider, uci):
 @DNS_APP.get('/system/dns_providers')
 @jwt_auth_required
 def get_dns_providers(uci):
-    """gets a list of DNS providers"""
+    """Geta list of DNS providers"""
     try:
         dns_uci = uci.get_package(DNS_PKG)
         resolv_servers = []
@@ -68,7 +68,7 @@ def get_dns_providers(uci):
 @DNS_APP.get('/system/dns')
 @jwt_auth_required
 def get_dns(uci):
-    """gets the id of the DNS provider used by the InvizBox 2"""
+    """Get the id of the DNS provider used by the InvizBox 2"""
     try:
         return {"dnsProviderId": uci.get_option(ADMIN_PKG, "invizbox", "dns_id") or "opendns"}
     except UciException:
@@ -77,7 +77,7 @@ def get_dns(uci):
 
 
 def replace_dnsmasq_servers(uci, section, provider_id):
-    """helper function to replace the dnsmasq section servers"""
+    """Helper function to replace the dnsmasq section servers"""
     local_dns_srvs = [ser for ser in uci.get_option(DHCP_PKG, section, "server") if ser.startswith("/")]
     if provider_id == "dhcp":
         try:
@@ -99,7 +99,7 @@ def replace_dnsmasq_servers(uci, section, provider_id):
 @DNS_APP.put('/system/dns')
 @jwt_auth_required
 def put_dns(uci):
-    """changes the id of the DNS provider used by the InvizBox 2"""
+    """Change the id of the DNS provider used by the InvizBox 2"""
     try:
         dns_json = dict(request.json)
         if not dns_json:

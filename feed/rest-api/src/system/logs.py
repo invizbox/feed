@@ -18,7 +18,7 @@ LOGS_APP.install(JWT_PLUGIN)
 @LOGS_APP.get('/system/logs/<log_path:path>')
 @jwt_auth_required
 def get_logfile(log_path):
-    """Endpoint to get access any log in the /var/log directory"""
+    """Get any log in the /var/log directory"""
     try:
         log_file = f"/var/log/{log_path}.log"
         if not path.isfile(log_file):
@@ -29,28 +29,28 @@ def get_logfile(log_path):
         return {"log": proc.stdout}
     except (TimeoutExpired, CalledProcessError) as exception:
         response.status = 404
-        return "Issues getting log file content: {}".format(exception.stderr)
+        return f"Issues getting log file content: {exception.stderr}"
 
 
 @LOGS_APP.get('/system/logs/system')
 @jwt_auth_required
 def get_systemlog():
-    """Endpoint to get access to the system log"""
+    """Get the system log"""
     try:
         logread_process = run("logread", stdout=PIPE, stderr=PIPE, universal_newlines=True, timeout=5, check=False)
         return {"log": logread_process.stdout}
     except (TimeoutExpired, CalledProcessError) as exception:
         response.status = 400
-        return "Problem running logread: {}".format(exception.stderr)
+        return f"Problem running logread: {exception.stderr}"
 
 
 @LOGS_APP.get('/system/logs/kernel')
 @jwt_auth_required
 def get_kernellog():
-    """Endpoint to get access to the kernel log"""
+    """Get the kernel log"""
     try:
         logread_process = run("dmesg", stdout=PIPE, stderr=PIPE, universal_newlines=True, timeout=5, check=False)
         return {"log": logread_process.stdout}
     except (TimeoutExpired, CalledProcessError) as exception:
         response.status = 400
-        return "Problem running dmesg: {}".format(exception.stderr)
+        return f"Problem running dmesg: {exception.stderr}"

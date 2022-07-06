@@ -19,7 +19,7 @@ BLACKLISTS_APP.install(UCI_PLUGIN)
 @BLACKLISTS_APP.get('/system/blacklists')
 @jwt_auth_required
 def get_blacklists(uci):
-    """lists the DNS Blacklists that can be used in profiles"""
+    """List the DNS Blacklists that can be used in profiles"""
     try:
 
         blacklists = [{"id": blacklist["id"],

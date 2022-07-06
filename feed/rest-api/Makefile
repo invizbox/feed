@@ -5,7 +5,7 @@ include $(INCLUDE_DIR)/version.mk
 
 PKG_NAME:=rest-api
 PKG_VERSION:=0.6
-PKG_RELEASE:=5
+PKG_RELEASE:=12
 
 include $(INCLUDE_DIR)/package.mk
 include ../../../packages/lang/python/python3-package.mk

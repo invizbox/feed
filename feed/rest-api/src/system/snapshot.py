@@ -26,7 +26,7 @@ HEADERS = {
 
 
 def anonymise():
-    """ helper function to anonymise the snapshot content """
+    """Helper function to anonymise the snapshot content"""
     run(["sed", "-i", "-E", "s/option key .+/option key 'anonymised'/", "/tmp/snapshot/config/known_networks"],
         check=False)
     run(["sed", "-i", "-E", "s/option password .+/option password 'anonymised'/", "/tmp/snapshot/config/rest-api"],
@@ -43,9 +43,7 @@ def anonymise():
 @SNAPSHOT_APP.get('/system/snapshot')
 @jwt_auth_required
 def get_snapshot():
-    """
-    gets a snapshot of the router's configuration useful for troubleshooting a support issue
-    """
+    """Get a snapshot of the router's configuration useful for troubleshooting a support issue"""
     run(["rm", "-rf", "/tmp/snapshot"], check=False)
     run(["mkdir", "-p", "/tmp/snapshot"], check=False)
     run(["cp", "-r", "/etc/config", "/tmp/snapshot"], check=False)

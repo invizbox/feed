@@ -35,7 +35,7 @@ INTERNET_APP.lock = Lock()
 
 
 def validate_internet(internet, uci):
-    """ validate an internet setup """
+    """Validate an internet setup"""
     valid = True
     try:
         valid &= validate_option("boolean", internet["cable"])
@@ -60,7 +60,7 @@ def validate_internet(internet, uci):
 @INTERNET_APP.get('/system/internet')
 @jwt_auth_required
 def get_internet(uci):
-    """Displays the current information used to connect to the internet"""
+    """Display the current information used to connect to the internet"""
     try:
         network_uci = uci.get_package(NETWORK_PKG)
         internet = next({
@@ -85,7 +85,7 @@ def get_internet(uci):
 
 
 def update_known_hotspots(updated_internet, uci):
-    """ Helper function to update the known_networks config with the new hotspot info """
+    """Helper function to update the known_networks config with the new hotspot info"""
     try:
         hotspots_uci = uci.get_package(KNOWN_NETWORKS_PKG)
         known_hotspot = next(hotspot for hotspot in hotspots_uci if hotspot["ssid"] == updated_internet["ssid"])
@@ -106,7 +106,7 @@ def update_known_hotspots(updated_internet, uci):
 @INTERNET_APP.put('/system/internet')
 @jwt_auth_required
 def set_internet(uci):
-    """Sets the information required to connect to the internet over cable or wireless"""
+    """Set the information required to connect to the internet over cable or wireless"""
     try:
         updated_internet = dict(request.json)
         if not validate_internet(updated_internet, uci):
@@ -160,7 +160,7 @@ def set_internet(uci):
 @INTERNET_APP.get('/system/internet/known_wifi_hotspots')
 @jwt_auth_required
 def get_known_hotspots(uci):
-    """ Returns known hotspots from uci """
+    """Get known hotspots from uci"""
     try:
         hotspots_uci = uci.get_package(KNOWN_NETWORKS_PKG)
         return {"wifiHotspots": [{"id": hotspot["id"], "ssid": hotspot["ssid"]} for hotspot in hotspots_uci]}
@@ -172,7 +172,7 @@ def get_known_hotspots(uci):
 @INTERNET_APP.get('/system/internet/known_wifi_hotspots/<hotspot_id>')
 @jwt_auth_required
 def get_known_hotspot(hotspot_id, uci):
-    """Returns the known WiFi hotspot"""
+    """Get a known WiFi hotspot"""
     try:
         hotspots_uci = uci.get_package(KNOWN_NETWORKS_PKG)
         hotspot = next(hotspot for hotspot in hotspots_uci if hotspot["id"] == hotspot_id)
@@ -188,12 +188,12 @@ def get_known_hotspot(hotspot_id, uci):
 @INTERNET_APP.get('/system/internet/wifi_hotspots')
 @jwt_auth_required
 def get_scan_results():
-    """Lists the results of the last WiFi scan if there was any."""
+    """List the results of the last WiFi scan if there was any"""
     return INTERNET_APP.scan_results
 
 
 def parse_hotspots(output):
-    """ helper function to parse hotspots from iwinfo output """
+    """Helper function to parse hotspots from iwinfo output"""
     hotspots = {}
     hotspot = {}
     ssid = "unknown"
@@ -224,7 +224,7 @@ def parse_hotspots(output):
 @INTERNET_APP.post('/system/internet/wifi_hotspots')
 @jwt_auth_required
 def scan():
-    """Scans and list nearby WiFi hotspots."""
+    """Scan and list nearby WiFi hotspots"""
     if INTERNET_APP.lock.acquire(False):  # pylint: disable=R1732
         try:
             with suppress(FileNotFoundError):

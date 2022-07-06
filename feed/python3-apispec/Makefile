@@ -1,12 +1,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=python3-apispec
-PKG_VERSION:=4.0.0
+PKG_VERSION:=5.1.1
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT
 
 PYPI_NAME:=apispec
-PKG_HASH:=360e28e5e84a4d7023b16de2b897327fe3da63ddc8e01f9165b9113b7fe1c48a
+PKG_HASH:=d167890e37f14f3f26b588ff2598af35faa5c27612264ea1125509c8ff860834
 
 include ../../../packages/lang/python/pypi.mk
 include $(INCLUDE_DIR)/package.mk

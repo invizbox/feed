@@ -16,6 +16,7 @@ local utils = require("invizboxutils")
 local netwatch2 = {}
 netwatch2.running = true
 netwatch2.state = nil
+netwatch2.update_ready = false
 
 -- here for unit testing the main function by overwriting this function
 function netwatch2.keep_running()
@@ -91,6 +92,7 @@ function netwatch2.set_dnsmasq_uci_captive(captive)
     end
     uci:save("dhcp")
     uci:commit("dhcp")
+    os.execute("sync")
     os.execute("kill -USR1 $(ps | grep [r]est_api | awk '{print $1}') 2>/dev/null")
     os.execute("/etc/init.d/dnsmasq reload")
 end
@@ -114,18 +116,18 @@ end
 
 function netwatch2.deal_with_connectivity(loop_count)
     if os.execute("ip route | grep '^default' > /dev/null") == 0 then
-        if netwatch2.state == "not connected" then
+        if netwatch2.state == "not connected" or netwatch2.state == nil then
             utils.log("wan interface is connected.")
-            -- Get Initial VPN server if needed
-            if (not netwatch2.city_1 and not netwatch2.city_2 and not netwatch2.city_3) then
-                utils.get_nearest_cities(netwatch2)
-            end
             -- LED
             led.connected()
             -- force date jump
             os.execute("/etc/init.d/sysntpd restart")
             -- DNS
             netwatch2.set_dnsmasq_uci_captive(false)
+        end
+        -- Get Initial VPN server if needed
+        if (not netwatch2.city_1 and not netwatch2.city_2 and not netwatch2.city_3) then
+            utils.get_nearest_cities(netwatch2)
         end
         local check_portal, tor_up = netwatch2.should_check_if_captive(loop_count)
         if check_portal then
@@ -245,9 +247,12 @@ function netwatch2.deal_with_swconfig(interface, port)
 end
 
 function netwatch2.deal_with_update()
-    uci:load("update")
-    if uci:get("update", "version", "new_firmware") ~= nil then
-        led.new_firmware()
+    if not netwatch2.update_ready then
+        uci:load("update")
+        if uci:get("update", "version", "new_firmware") ~= nil then
+            netwatch2.update_ready = true
+            led.new_firmware()
+        end
     end
 end
 

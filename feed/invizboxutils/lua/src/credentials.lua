@@ -77,7 +77,7 @@ function credentials.set_vpn_credentials(openvpn_usr, openvpn_pass, ipsec_usr, i
             os.execute("! diff -q /tmp/vpn_credentials.txt /private/vpn_credentials.txt"..
                     "&& cp /tmp/vpn_credentials.txt /private/vpn_credentials.txt")
         end
-        if ipsec_usr and ipsec_pass then
+        if ipsec_usr ~= "" and ipsec_pass ~= "" then
             if os.execute('echo "'..ipsec_usr..' '..ipsec_pass..'" > /tmp/ipsec_credentials.txt') == 0 then
                 os.execute("! diff -q /tmp/ipsec_credentials.txt /private/ipsec_credentials.txt"..
                         "&& cp /tmp/ipsec_credentials.txt /private/ipsec_credentials.txt")

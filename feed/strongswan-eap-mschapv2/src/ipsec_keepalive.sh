@@ -12,7 +12,7 @@ for vpn_interface in vpn_1 vpn_2 vpn_3 vpn_4
 do
     if [ "$(uci get ipsec.${vpn_interface}.enabled)" == "1" ]; then
         if ipsec stroke statusall "${vpn_interface}" | grep -q INSTALLED; then
-            ping -4 -c 1 -I "tun${vpn_interface:4}" 8.8.8.8 >/dev/null 2>&1
+            ping -4 -c 1 -I "tun${vpn_interface:4}" 1.1.1.1 >/dev/null 2>&1
         else
             echo "Restarting ${vpn_interface} as the tunnel is down" >/dev/kmsg
             ipsec stroke up "${vpn_interface}"

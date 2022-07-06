@@ -87,9 +87,10 @@ def index():
         auth_required = hasattr(route.callback, 'auth_required')
         if route.rule == "/auth/token":
             route.callback.__doc__ = "Authorisation point - used to request an access token (JWT)"
-        api_calls[route.rule] = {"method": route.method,
-                                 "documentation": route.callback.__doc__,
-                                 "auth_required": auth_required}
+        if route.rule not in api_calls:
+            api_calls[route.rule] = {}
+        api_calls[route.rule][route.method] = {"documentation": route.callback.__doc__,
+                                               "auth_required": auth_required}
     return {"apiCalls": api_calls}
 
 
@@ -111,7 +112,7 @@ def explicit_404():
 
 
 def handle_usr1_signal(_signum, _frame):
-    """ handling USR1 - used to reload VPN, and update configurations when modified """
+    """Handle USR1 - used to reload VPN, and update configurations when modified"""
     LOGGER.info("reloading admin-interface, blacklists, dhcp, update, wireless and vpn configuration")
     UCI_PLUGIN.uci.parse(VPN_PKG)
     UCI_PLUGIN.uci.parse(ADMIN_PKG)
@@ -124,7 +125,7 @@ def handle_usr1_signal(_signum, _frame):
 
 
 def main():
-    """ main function """
+    """Main function"""
     # BOTTLE_APP.run(host='127.0.0.1', port=8080, debug=True, reloader=True)
     LOGGER.info("Starting the REST API Bottle App")
     initial_scan_thread = Thread(target=scan, daemon=True)

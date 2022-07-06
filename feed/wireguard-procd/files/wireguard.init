@@ -35,7 +35,7 @@ start_instance() {
 #	wan_mtu=$(cat /sys/class/net/eth0.2/mtu)
 #	ping_mtu=$(expr ${wan_mtu} - 28)
 #	ifconfig ${dev} mtu "${wan_mtu}" up
-#	new_mtu=$(ping -s ${ping_mtu} -c1 -M do -I ${dev} 8.8.8.8 2>/dev/null | grep 'Frag needed' | awk '{print substr($11,0,length($11)-1)}')
+#	new_mtu=$(ping -s ${ping_mtu} -c1 -M do -I ${dev} 1.1.1.1 2>/dev/null | grep 'Frag needed' | awk '{print substr($11,0,length($11)-1)}')
 #	if [ -n "${new_mtu}" ]; then
 #		ifconfig ${dev} mtu ${new_mtu} up
 #	fi

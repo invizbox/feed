@@ -4,10 +4,13 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=strongswan-eap-mschapv2
 PKG_VERSION:=1.0
-PKG_RELEASE:=0
+PKG_RELEASE:=1
 
 LE_CERT_FILENAME:=lets-encrypt-x3-cross-signed.pem
 LE_CERT_URL:=https://letsencrypt.org/certs/
+NORDVPN_FILENAME:=NordVPN.pem
+NORDVPN_URL:=https://downloads.nordcdn.com/certificates/
+NORDVPN_URL_NAME:=root.pem
 PROTONVPN_FILENAME:=ProtonVPN_ike_root.der
 PROTONVPN_URL:=https://protonvpn.com/download/
 SURFSHARK_URL_NAME:=ikev2
@@ -19,6 +22,13 @@ include $(INCLUDE_DIR)/package.mk
 define Download/letsencrypt-cert
 	FILE:=$(LE_CERT_FILENAME)
 	URL:=$(LE_CERT_URL)
+	HASH:=skip
+endef
+
+define Download/nordvpn-cert
+	FILE:=$(NORDVPN_FILENAME)
+	URL:=$(NORDVPN_URL)
+	URL_FILE:=$(NORDVPN_URL_NAME)
 	HASH:=skip
 endef
 
@@ -36,6 +46,7 @@ define Download/surfshark-cert
 endef
 
 $(eval $(call Download,letsencrypt-cert))
+$(eval $(call Download,nordvpn-cert))
 $(eval $(call Download,protonvpn-cert))
 $(eval $(call Download,surfshark-cert))
 
@@ -96,6 +107,7 @@ define Package/strongswan-eap-mschapv2/install
 	$(INSTALL_DIR) $(1)/etc/ipsec.d
 	$(LN) /etc/ssl/certs $(1)/etc/ipsec.d/cacerts
 	$(INSTALL_DATA) $(DL_DIR)/$(LE_CERT_FILENAME) $(1)/etc/ssl/certs
+	$(INSTALL_DATA) $(DL_DIR)/$(NORDVPN_FILENAME) $(1)/etc/ssl/certs
 	$(INSTALL_DATA) $(DL_DIR)/$(PROTONVPN_FILENAME) $(1)/etc/ssl/certs
 	$(INSTALL_DATA) $(DL_DIR)/$(SURFSHARK_FILENAME) $(1)/etc/ssl/certs
 endef
@@ -109,6 +121,8 @@ define Package/strongswan-eap-mschapv2-light/install
 	$(LN) /etc/ssl/certs/ISRG_Root_X1.crt $(1)/etc/ipsec.d/cacerts
 	$(INSTALL_DATA) $(DL_DIR)/$(LE_CERT_FILENAME) $(1)/etc/ssl/certs
 	$(LN) /etc/ssl/certs/$(LE_CERT_FILENAME) $(1)/etc/ipsec.d/cacerts
+	$(INSTALL_DATA) $(DL_DIR)/$(NORDVPN_FILENAME) $(1)/etc/ssl/certs
+	$(LN) /etc/ssl/certs/$(NORDVPN_FILENAME) $(1)/etc/ipsec.d/cacerts
 	$(INSTALL_DATA) $(DL_DIR)/$(PROTONVPN_FILENAME) $(1)/etc/ssl/certs
 	$(LN) /etc/ssl/certs/$(PROTONVPN_FILENAME) $(1)/etc/ipsec.d/cacerts
 	$(INSTALL_DATA) $(DL_DIR)/$(SURFSHARK_FILENAME) $(1)/etc/ssl/certs

@@ -9,7 +9,7 @@ from plugins.uci import Uci
 
 
 class UCIPlugin:
-    """ pass a handle to uci to routes who need it """
+    """Pass a handle to uci to routes who need it"""
 
     name = 'uci'
     api = 2
@@ -20,22 +20,22 @@ class UCIPlugin:
         self.identifier = identifier
 
     def setup(self, app):
-        """ Make sure that other installed plugins are for different directories"""
+        """Make sure that other installed plugins are for different directories"""
         for other in app.plugins:
             if not isinstance(other, UCIPlugin):
                 continue
             if other.config_dir == self.config_dir:
                 raise PluginError("Found another uci plugin")
             if other.name == self.name:
-                self.name += '_%s' % self.config_dir
+                self.name += f'_{self.config_dir}'
 
     def apply(self, callback, _):
-        """ called on each route activation """
+        """Called on each route activation"""
         if self.identifier not in signature(callback).parameters:
             return callback
 
         def wrapper(*args, **kwargs):
-            """ adding our Uci object when requested - called on each request"""
+            """Adding our Uci object when requested - called on each request"""
             kwargs[self.identifier] = self.uci
             return callback(*args, **kwargs)
 

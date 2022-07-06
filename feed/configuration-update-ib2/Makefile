@@ -5,7 +5,7 @@ include $(INCLUDE_DIR)/version.mk
 
 PKG_NAME:=configuration-update-ib2
 PKG_VERSION:=$(VERSION_NUMBER)
-PKG_RELEASE:=3
+PKG_RELEASE:=1
 
 include $(INCLUDE_DIR)/package.mk
 

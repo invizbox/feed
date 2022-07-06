@@ -20,7 +20,7 @@ SSH_KEYS_APP.install(JWT_PLUGIN)
 @SSH_KEYS_APP.get('/system/ssh_keys')
 @jwt_auth_required
 def get_ssh():
-    """gets the SSH current keys"""
+    """Get the SSH current keys"""
     public_keys = []
     try:
         with open("/etc/dropbear/authorized_keys", "r", encoding="utf-8") as auth_keys_file:
@@ -35,7 +35,7 @@ def get_ssh():
 @SSH_KEYS_APP.put('/system/ssh_keys')
 @jwt_auth_required
 def put_ssh():
-    """sets SSH keys"""
+    """Set SSH keys"""
     try:
         ssh_json = dict(request.json)
         if not ssh_json:

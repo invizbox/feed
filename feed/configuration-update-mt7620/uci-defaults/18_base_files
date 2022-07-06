@@ -81,6 +81,17 @@ if [ "$(version "${pre_update_version}")" -lt "$(version 3.0.6)" ]; then
     uci commit vpn
 fi
 if [ "$(version "${pre_update_version}")" -lt "$(version 4.1.3)" ]; then
+    # adblock
+    uci set adblock.global.adb_backup=0
+    uci set adblock.global.adb_safesearch=0
+    uci add_list adblock.global.adb_sources=adaway
+    uci add_list adblock.global.adb_sources=disconnect
+    uci add_list adblock.global.adb_sources=yoyo
+    uci delete adblock.extra
+    uci delete adblock.adaway
+    uci delete adblock.blacklist
+    uci delete adblock.disconnect
+    uci delete adblock.yoyo
     # dhcp
     sed -i "s/vpn0/vpn1/g;s/tun0/tun1/g" /etc/config/dhcp
     sed -i 's|/tmp/resolv.conf.auto|/tmp/resolv.conf.d/resolv.conf.auto|' /etc/config/dhcp
@@ -90,24 +101,29 @@ if [ "$(version "${pre_update_version}")" -lt "$(version 4.1.3)" ]; then
     uci delete dhcp.invizbox.nonegcache
     uci delete dhcp.invizbox.nonwildcard
     uci delete dhcp.invizbox.rebind_protection
+    uci delete dhcp.invizbox.serversfile
     uci delete dhcp.vpn1.boguspriv
     uci delete dhcp.vpn1.filterwin2k
     uci delete dhcp.vpn1.nonegcache
     uci delete dhcp.vpn1.nonwildcard
+    uci delete dhcp.vpn1.serversfile
     uci delete dhcp.tor.boguspriv
     uci delete dhcp.tor.filterwin2k
     uci delete dhcp.tor.nonegcache
     uci delete dhcp.tor.nonwildcard
+    uci delete dhcp.tor.serversfile
     uci set dhcp.tor.rebind_protection=0
     uci add_list dhcp.tor.server=/onion/172.31.1.1#9053
     uci delete dhcp.auto.boguspriv
     uci delete dhcp.auto.filterwin2k
     uci delete dhcp.auto.nonegcache
     uci delete dhcp.auto.nonwildcard
+    uci delete dhcp.auto.serversfile
     uci delete dhcp.captive.boguspriv
     uci delete dhcp.captive.filterwin2k
     uci delete dhcp.captive.nonegcache
     uci delete dhcp.captive.nonwildcard
+    uci delete dhcp.captive.serversfile
     uci commit dhcp
     # dns
     uci set dns.main=dns
@@ -167,4 +183,9 @@ if [ "$(version "${pre_update_version}")" -lt "$(version 4.1.3)" ]; then
     uci commit wireless
     # wizard
     rm /etc/config/wizard
+fi
+if [ "$(version "${pre_update_version}")" -lt "$(version 4.1.13)" ]; then
+    # system
+    uci set system.system.ttylogin=1
+    uci commit system
 fi

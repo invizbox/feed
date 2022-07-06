@@ -68,6 +68,7 @@ function wifiwatch.connect_to_wifi(ssid, encryption, key)
         uci:delete("wireless", "wan", "key")
     end
     uci:commit("wireless")
+    os.execute("sync")
     os.execute("kill -USR1 $(ps | grep [r]est_api | awk '{print $1}') 2>/dev/null")
     return wifiwatch.restart_wan()
 end
@@ -125,6 +126,7 @@ function wifiwatch.deal_with_station()
                 utils.log("switching WAN to scanning mode.")
                 uci:set("wireless", "wan", "mode", "scan")
                 uci:commit("wireless")
+                os.execute("sync")
                 os.execute("wifi")
             end
             return 20

@@ -25,8 +25,17 @@ INFO_APP.install(UCI_PLUGIN)
 INFO_APP.install(UCI_ROM_PLUGIN)
 
 
+def get_mac(filename):
+    """Helper function to get the MAC address from a file"""
+    try:
+        with open(filename, encoding="utf-8") as my_file:
+            return my_file.readline().rstrip().upper()
+    except FileNotFoundError:
+        return ''
+
+
 def get_uci_info(uci, package, section, option):
-    """helper function to get the value from UCI """
+    """Helper function to get the value from UCI"""
     try:
         return uci.get_option(package, section, option) or "unknown"
     except UciException:
@@ -36,20 +45,21 @@ def get_uci_info(uci, package, section, option):
 @INFO_APP.get('/system/info/generic')
 @jwt_auth_required
 def get_generic_info(uci, uci_rom):
-    """Endpoint to get access the fixed properties of the device
-    Model
-    Kernel
-    Hostname
-    Mac Addresses
-    Firmware Version: current, reset and new
-    API Version
-    admin-interface Version
-    Ports
-    """
+    """Get the device properties"""
     try:
         ubus_process = run(["ubus", "call", "system", "board"], stdout=PIPE, stderr=PIPE, timeout=5, check=False)
         system_json = json_loads(ubus_process.stdout)
         model = getenv("DEVICE_PRODUCT", "InvizBox 2")
+        mac_addresses = {"ethernet": "", "wifi24GHz": "", "wifi5GHz": ""}
+        if model == "InvizBox Go":
+            mac_addresses["wifi24GHz"] = get_mac("/sys/devices/platform/1e140000.pcie/pci0000:00/0000:00:00.0"
+                                                 "/0000:01:00.0/net/wlan0/address")
+        elif model == "InvizBox 2":
+            mac_addresses["ethernet"] = get_mac("/sys/devices/platform/soc/1c30000.ethernet/net/eth0/address")
+            mac_addresses["wifi24GHz"] = get_mac("/sys/devices/platform/soc/1c1b000.usb/usb2/2-1/2-1:1.0/ieee80211/phy1"
+                                                 "/addresses")
+            mac_addresses["wifi5GHz"] = get_mac("/sys/devices/platform/soc/1c10000.mmc/mmc_host/mmc1/mmc1:0001"
+                                                "/mmc1:0001:1/ieee80211/phy0/addresses")
         try:
             admin_interface_version = ''
             with open("/usr/lib/opkg/info/admin-interface.control", encoding="utf-8") as admin_interface_file:
@@ -75,6 +85,7 @@ def get_generic_info(uci, uci_rom):
                          "adminInterface": admin_interface_version,
                          "kernel": system_json["kernel"],
                          "hostName": system_json["hostname"],
+                         "macAddresses": mac_addresses,
                          "model": model,
                          "ports": ports}}
     except JSONDecodeError:
@@ -85,11 +96,7 @@ def get_generic_info(uci, uci_rom):
 @INFO_APP.get('/system/info/state')
 @jwt_auth_required
 def get_stateful_info():
-    """Endpoint to get access the changing properties of the device
-    Local Time
-    Uptime
-    memory
-    """
+    """Get the state of the device"""
     try:
         ubus_process = run(["ubus", "call", "system", "info"], stdout=PIPE, stderr=PIPE, timeout=5, check=False)
         system_json = json_loads(ubus_process.stdout)
@@ -100,7 +107,7 @@ def get_stateful_info():
 
 
 def receive_all(sock, buffer_size=1000):
-    """read all available on a socket"""
+    """Read all available on a socket"""
     buf = sock.recv(buffer_size)
     while buf:
         yield buf.decode()
@@ -110,7 +117,7 @@ def receive_all(sock, buffer_size=1000):
 
 
 def tor_up():
-    """call the Tor admin interface a get a status"""
+    """Call the Tor admin interface a get a status"""
     try:
         with socket(AF_INET, SOCK_STREAM) as tor_socket:
             tor_socket.settimeout(1)
@@ -128,7 +135,7 @@ def tor_up():
 
 
 def check_file_content(filename, expected_content):
-    """helper function to check a file content"""
+    """Helper function to check a file content"""
     correct_content = False
     try:
         with open(filename, "r", encoding="utf-8") as quick_read_file:
@@ -141,7 +148,7 @@ def check_file_content(filename, expected_content):
 @INFO_APP.get('/system/info/connectivity')
 @jwt_auth_required
 def get_connectivity_info():
-    """Endpoint to get access the connectivity properties of the device"""
+    """Get the connectivity properties of the device"""
     try:
         ip_route = run(["ip", "route"], stdout=PIPE, stderr=PIPE, timeout=5, check=False)
         invizbox_ip = next((line.strip().split(' ')[-1] for line in ip_route.stdout.decode('ascii').splitlines()

@@ -29,26 +29,27 @@ PROVIDER_NAMES = {
     "expressvpn": "ExpressVPN",
     "invizbox": "InvizBox",
     "ipvanish": "IPVanish",
-    "myexpatnetwork": "MY Expat Network",
+    "myexpatnetwork": "StreamVPN",
     "nordvpn": "NordVPN",
     "pia": "PIA",
     "protonvpn": "ProtonVPN",
     "surfshark": "Surfshark",
     "vanishedvpn": "VanishedVPN",
+    "vpncity": "VPNCity",
     "windscribe": "Windscribe",
 }
 
 
 @contextmanager
 def hold_ping():
-    """context manager function to fail ping when the device is not ready for API calls"""
+    """Context manager function to fail ping when the device is not ready for API calls"""
     ADMIN_INTERFACE_APP.ping_ready = False
     yield
     ADMIN_INTERFACE_APP.ping_ready = True
 
 
 def get_provider_name(provider_id):
-    """ returns the display name for the vpn provider """
+    """Get the display name for the vpn provider"""
     try:
         provider_name = PROVIDER_NAMES[provider_id]
     except KeyError:
@@ -57,7 +58,7 @@ def get_provider_name(provider_id):
 
 
 def validate_ftux(ftux):
-    """ validate the ftux object """
+    """Validate the ftux object"""
     valid = True
     try:
         valid &= validate_option("boolean", ftux["devices"])
@@ -72,7 +73,7 @@ def validate_ftux(ftux):
 
 
 def validate_onboarding(onboarding):
-    """ validate the onboarding object """
+    """Validate the onboarding object"""
     valid = True
     try:
         valid &= validate_option("boolean", onboarding["onboarding"]["needed"])
@@ -83,7 +84,7 @@ def validate_onboarding(onboarding):
 
 @ADMIN_INTERFACE_APP.get('/ping')
 def ping():
-    """simple endpoint to ping API availability - returns a 204 or 503 depending on API readiness"""
+    """Ping API availability - returns a 204 or 503 depending on server readiness"""
     if ADMIN_INTERFACE_APP.ping_ready:
         response.status = 204
     else:
@@ -93,7 +94,7 @@ def ping():
 @ADMIN_INTERFACE_APP.get('/admin_interface/ftux')
 @jwt_auth_required
 def get_ftux(uci):
-    """gets a list of First Time User Experiences for the Administration Interface"""
+    """Get a list of First Time User Experiences for the Administration Interface"""
     try:
         ftux = {}
         for item in ["devices", "home", "networks", "profiles", "support", "system"]:
@@ -107,7 +108,7 @@ def get_ftux(uci):
 @ADMIN_INTERFACE_APP.put('/admin_interface/ftux')
 @jwt_auth_required
 def set_ftux(uci):
-    """ updates the list of First Time User Experiences for the Administration Interface"""
+    """Update the list of First Time User Experiences for the Administration Interface"""
     try:
         updated_ftux = dict(request.json)
         validate_ftux(updated_ftux)
@@ -122,7 +123,7 @@ def set_ftux(uci):
 
 @ADMIN_INTERFACE_APP.get('/admin_interface/onboarding')
 def get_onboarding(uci):
-    """gets onboarding information for the Administration Interface"""
+    """Get onboarding information for the Administration Interface"""
     try:
         plans = vpn.get_plans(uci)
         try:
@@ -176,7 +177,7 @@ def get_onboarding(uci):
 @ADMIN_INTERFACE_APP.put('/admin_interface/onboarding')
 @jwt_auth_required
 def set_onboarding(uci):
-    """ updates whether or not onboarding is still needed in the Administration Interface"""
+    """Update if onboarding is still needed in the Administration Interface"""
     try:
         updated_onboarding = dict(request.json)
         if validate_onboarding(updated_onboarding):

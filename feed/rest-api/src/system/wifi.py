@@ -25,7 +25,7 @@ WIFI_APP.install(UCI_PLUGIN)
 @WIFI_APP.get('/system/wifi')
 @jwt_auth_required
 def get_wifi(uci):
-    """gets the WiFi channels currently used for 2.4GHZ and 5GHz"""
+    """Get the WiFi channels currently used for 2.4GHZ and 5GHz"""
     try:
         wireless_uci = uci.get_package(WIRELESS_PKG)
         channel_24, channel_5 = ("11", "36")
@@ -42,7 +42,7 @@ def get_wifi(uci):
 
 
 def validate_wifi(wifi):
-    """validate wifi settings"""
+    """Validate wifi settings"""
     valid = True
     try:
         valid &= validate_option("integer", wifi["channels"]["2.4GHz"])
@@ -58,7 +58,7 @@ def validate_wifi(wifi):
 @WIFI_APP.put('/system/wifi')
 @jwt_auth_required
 def set_wifi(uci):
-    """sets the WiFi channels used for 2.4GHz and 5GHz"""
+    """Set the WiFi channels used for 2.4GHz and 5GHz"""
     try:
         wifi = dict(request.json)
         if not validate_wifi(wifi):

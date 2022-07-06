@@ -236,3 +236,8 @@ footer {
     overflow: unset !important;
     margin-top: 2em;
 }
+
+label.btn {
+    display: inline-table;
+    white-space: unset;
+}

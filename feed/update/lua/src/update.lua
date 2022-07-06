@@ -129,6 +129,7 @@ function update.change_locations_if_obsolete(pre_update_locations)
         uci:commit("vpn")
         uci:save("admin-interface")
         uci:commit("admin-interface")
+        os.execute("sync")
         os.execute("kill -USR1 $(ps | grep [r]est_api | awk '{print $1}') 2>/dev/null")
         for vpn_interface, tun_name in pairs(interfaces) do
             utils.apply_vpn_config(uci, vpn_interface, tun_name)
@@ -173,6 +174,7 @@ function update.deal_with_new_vpn_config(content_sha)
         if ok_s and changed_s and ok_p and changed_p then
             uci:save("vpn")
             uci:commit("vpn")
+            os.execute("sync")
             update.change_locations_if_obsolete(pre_update_locations)
             utils.log("New VPN configurations are now in place")
         else
@@ -183,6 +185,7 @@ function update.deal_with_new_vpn_config(content_sha)
         uci:set("update", "active", "current_vpn_sha", content_sha) -- even if invalid, we've dealt with them
         uci:save("update")
         uci:commit("update")
+        os.execute("sync")
         return true
     end
     return false
@@ -271,6 +274,7 @@ function update.update_firmware()
                 uci:set("update", "version", "new_firmware", new_version)
                 uci:save("update")
                 uci:commit("update")
+                os.execute("sync")
                 return 1
             else
                 utils.log("Downloading new firmware.")
@@ -291,6 +295,7 @@ function update.update_firmware()
                         uci:set("update", "version", "new_firmware", new_version)
                         uci:save("update")
                         uci:commit("update")
+                        os.execute("sync")
                     else
                         utils.log("Downloaded binary doesn't match downloaded hash, will try again later")
                         return 2
@@ -382,6 +387,7 @@ function update.update_vpn_status()
             end
             uci:save("vpn")
             uci:commit("vpn")
+            os.execute("sync")
             return true
         else
             utils.log("received invalid JSON from server")
@@ -407,6 +413,7 @@ function update.version_only()
             uci:set("update", "version", "new_firmware", new_version)
             uci:save("update")
             uci:commit("update")
+            os.execute("sync")
         end
     end
 end
@@ -452,6 +459,7 @@ function update.update_blacklists()
                     if successful_replacement then
                         uci:save("blacklists")
                         uci:commit("blacklists")
+                        os.execute("sync")
                     end
 
                     -- move blacklists
@@ -462,6 +470,7 @@ function update.update_blacklists()
                     uci:set("update", "active", "current_blacklists_sha", content_sha)
                     uci:save("update")
                     uci:commit("update")
+                    os.execute("sync")
                 else
                     utils.log("Invalid sha256 after download, will try again later")
                     return 1
@@ -510,7 +519,9 @@ function update.do_update()
     if update.provider_id == "invizbox" then
         utils.log("Updating VPN status.")
         success, return_value = pcall(update.update_vpn_status)
-        if not success then
+        if success then
+            notify_rest_api = (return_value == true) or notify_rest_api
+        else
             utils.log("Error updating VPN status: "..return_value)
         end
     end

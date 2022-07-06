@@ -21,7 +21,7 @@ USERS_APP.install(UCI_PLUGIN)
 
 
 def validate_user(user):
-    """validate a user object"""
+    """Validate a user object"""
     valid = True
     try:
         valid &= validate_option("string", user["password"])
@@ -34,7 +34,7 @@ def validate_user(user):
 @USERS_APP.get('/users')
 @jwt_auth_required
 def get_users(uci):
-    """gets the list of administration interface users"""
+    """Get the list of administration interface users"""
     try:
         users_uci = uci.get_package(REST_API_PKG)
         users = [{'id': int(user["id"]), 'name': user["name"]} for user in users_uci if user[".type"] == "user"]
@@ -47,7 +47,7 @@ def get_users(uci):
 @USERS_APP.put('/users/<user_id>')
 @jwt_auth_required
 def put_user(user_id, uci):
-    """changes a user password"""
+    """Change a user password"""
     try:
         updated_user = dict(request.json)
         if not validate_user(updated_user):

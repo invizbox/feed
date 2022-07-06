@@ -12,12 +12,11 @@ REST_API_PKG = "rest-api"
 
 
 class IB2Backend(BaseAuthBackend):
-    """Implementing an auth backend class with at least two methods.
-    """
+    """Implementing an auth backend class with at least two methods"""
     uci = UCI_PLUGIN.uci
 
     def authenticate_user(self, username, password):
-        """authenticate user by name and password"""
+        """Authenticate user by name and password"""
         users_uci = self.uci.get_package(REST_API_PKG)
         return_user = None
         for user in users_uci:
@@ -31,7 +30,7 @@ class IB2Backend(BaseAuthBackend):
         return return_user
 
     def get_user(self, user_id):
-        """retrieve user by id"""
+        """Retrieve user by id"""
         users_uci = self.uci.get_package(REST_API_PKG)
         try:
             user = next({'id': int(user["id"]),
